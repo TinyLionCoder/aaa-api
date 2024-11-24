@@ -21,7 +21,7 @@ const generateToken = (userId: string, email: string) => {
 
 // POST /signup
 router.post("/signup", async (req: Request, res: Response) => {
-  const { email, password, referralCode } = req.body;
+  const { email, password, referralCode, walletAddress } = req.body;
 
   // Validate origin
   const origin = req.get("origin");
@@ -31,6 +31,10 @@ router.post("/signup", async (req: Request, res: Response) => {
 
   if (!email || !password) {
     return res.status(400).json({ message: "Email and password are required" });
+  }
+
+  if (!walletAddress) {
+    return res.status(400).json({ message: "Wallet address is required" });
   }
 
   try {
@@ -64,6 +68,7 @@ router.post("/signup", async (req: Request, res: Response) => {
 
     const newUser = {
       email,
+      walletAddress, // Store wallet address
       referralCode: generatedReferralCode,
       referredBy,
       aaaBalance: 5,
@@ -130,6 +135,11 @@ router.post("/signup", async (req: Request, res: Response) => {
 router.post("/login", async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
+  const origin = req.get("origin");
+  if (origin !== "https://aaa-test-env.vercel.app") {
+    return res.status(403).json({ success: false, message: "Forbidden" });
+  }
+
   if (!email || !password) {
     return res.status(400).json({ message: "Email and password are required" });
   }
@@ -160,6 +170,7 @@ router.post("/login", async (req: Request, res: Response) => {
       aaaBalance: userData?.aaaBalance,
       referrals: userData?.referrals,
       token: generateToken(userId, email),
+      walletAddress: userData?.walletAddress,
     });
   } catch (error) {
     if (axios.isAxiosError(error)) {
