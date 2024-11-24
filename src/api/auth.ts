@@ -38,6 +38,19 @@ router.post("/signup", async (req: Request, res: Response) => {
   }
 
   try {
+    // Check if walletAddress is already in use
+    const walletCheckSnapshot = await db
+      .collection("users")
+      .where("walletAddress", "==", walletAddress)
+      .get();
+
+    if (!walletCheckSnapshot.empty) {
+      console.log("Wallet address already in use");
+      return res
+        .status(400)
+        .json({ message: "This wallet address is already in use." });
+    }
+
     // Validate referral code if provided
     let referredBy = GENESIS_REFERRAL_CODE;
 
@@ -124,6 +137,7 @@ router.post("/signup", async (req: Request, res: Response) => {
       referralCode: newUser.referralCode,
       aaaBalance: newUser.aaaBalance,
       token: generateToken(userId, email),
+      walletAddress: newUser.walletAddress,
     });
   } catch (error) {
     console.error("Signup error:", error);
@@ -133,80 +147,82 @@ router.post("/signup", async (req: Request, res: Response) => {
 
 // POST /login
 router.post("/login", async (req: Request, res: Response) => {
-  const { email, password } = req.body;
+  const { email, password, walletAddress } = req.body;
 
   const origin = req.get("origin");
   if (origin !== "https://aaa-test-env.vercel.app") {
     return res.status(403).json({ success: false, message: "Forbidden" });
   }
 
-  if (!email || !password) {
-    return res.status(400).json({ message: "Email and password are required" });
-  }
-
   try {
-    // Authenticate the email and password using Firebase REST API
-    const authResponse = await axios.post(FIREBASE_AUTH_URL, {
-      email,
-      password,
-      returnSecureToken: true,
-    });
+    if (email && password) {
+      // Authenticate with email and password
+      const authResponse = await axios.post(FIREBASE_AUTH_URL, {
+        email,
+        password,
+        returnSecureToken: true,
+      });
 
-    const userId = authResponse.data.localId; // Firebase UID from response
+      const userId = authResponse.data.localId; // Firebase UID from response
 
-    // Retrieve user data from Firestore
-    const userSnapshot = await db.collection("users").doc(userId).get();
+      // Retrieve user data from Firestore
+      const userSnapshot = await db.collection("users").doc(userId).get();
 
-    if (!userSnapshot.exists) {
-      return res.status(404).json({ message: "User not found in Firestore" });
+      if (!userSnapshot.exists) {
+        return res.status(404).json({ message: "User not found in Firestore" });
+      }
+
+      const userData = userSnapshot.data();
+
+      return res.json({
+        message: "Login successful",
+        userId,
+        referralCode: userData?.referralCode,
+        aaaBalance: userData?.aaaBalance,
+        referrals: userData?.referrals,
+        token: generateToken(userId, email),
+        walletAddress: userData?.walletAddress,
+      });
+    } else if (walletAddress) {
+      // Authenticate with wallet address
+      const userSnapshot = await db
+        .collection("users")
+        .where("walletAddress", "==", walletAddress)
+        .get();
+
+      if (userSnapshot.empty) {
+        return res
+          .status(404)
+          .json({ message: "Wallet address not registered" });
+      }
+
+      const userDoc = userSnapshot.docs[0];
+      const userData = userDoc.data();
+
+      return res.json({
+        message: "Login successful",
+        userId: userDoc.id,
+        referralCode: userData?.referralCode,
+        aaaBalance: userData?.aaaBalance,
+        referrals: userData?.referrals,
+        token: generateToken(userDoc.id, userData.email),
+        walletAddress: userData?.walletAddress,
+      });
+    } else {
+      return res
+        .status(400)
+        .json({
+          message: "Either email/password or wallet address is required",
+        });
     }
-
-    const userData = userSnapshot.data();
-
-    res.json({
-      message: "Login successful",
-      userId,
-      referralCode: userData?.referralCode,
-      aaaBalance: userData?.aaaBalance,
-      referrals: userData?.referrals,
-      token: generateToken(userId, email),
-      walletAddress: userData?.walletAddress,
-    });
   } catch (error) {
     if (axios.isAxiosError(error)) {
       console.error("Login error:", error.response?.data || error.message);
     } else {
       console.error("Login error:", error);
     }
-    res.status(401).json({ message: "Invalid email or password" });
+    res.status(401).json({ message: "Invalid credentials" });
   }
 });
-
-// POST /withdraw (Protected)
-router.post(
-  "/withdraw",
-  authenticateToken,
-  async (req: Request, res: Response) => {
-    const { userId } = req.user!;
-
-    try {
-      const userRef = db.collection("users").doc(userId);
-      const userSnap = await userRef.get();
-
-      if (!userSnap.exists || userSnap.data()?.aaaBalance < 5) {
-        return res.status(400).json({ message: "Insufficient balance" });
-      }
-
-      await userRef.update({
-        aaaBalance: admin.firestore.FieldValue.increment(-5),
-      });
-
-      res.json({ message: "Withdrawal successful" });
-    } catch (error) {
-      console.error("Withdrawal error:", error);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  }
-);
 
 export default router;
