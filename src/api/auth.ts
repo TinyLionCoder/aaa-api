@@ -4,9 +4,8 @@ import jwt from "jsonwebtoken";
 import admin from "firebase-admin";
 import axios from "axios";
 import { authenticateToken } from "../middlewares";
-import dotenv from 'dotenv';
+import dotenv from "dotenv";
 dotenv.config();
-
 
 const router = express.Router();
 const GENESIS_REFERRAL_CODE = "GENESIS";
@@ -23,6 +22,12 @@ const generateToken = (userId: string, email: string) => {
 // POST /signup
 router.post("/signup", async (req: Request, res: Response) => {
   const { email, password, referralCode } = req.body;
+
+  // Validate origin
+  const origin = req.get("origin");
+  if (origin !== "https://aaa-test-env.vercel.app") {
+    return res.status(403).json({ success: false, message: "Forbidden" });
+  }
 
   if (!email || !password) {
     return res.status(400).json({ message: "Email and password are required" });
@@ -92,10 +97,13 @@ router.post("/signup", async (req: Request, res: Response) => {
       const referrerId = referrerDoc.id;
 
       // Update the referrer's balance and referrals array
-      await db.collection("users").doc(referrerId).update({
-        aaaBalance: admin.firestore.FieldValue.increment(5),
-        referrals: admin.firestore.FieldValue.arrayUnion(userId),
-      });
+      await db
+        .collection("users")
+        .doc(referrerId)
+        .update({
+          aaaBalance: admin.firestore.FieldValue.increment(5),
+          referrals: admin.firestore.FieldValue.arrayUnion(userId),
+        });
 
       // Move to the next referrer in the chain
       currentReferrer = referrerDoc.data()?.referredBy || GENESIS_REFERRAL_CODE;
@@ -117,7 +125,6 @@ router.post("/signup", async (req: Request, res: Response) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
-
 
 // POST /login
 router.post("/login", async (req: Request, res: Response) => {
