@@ -103,7 +103,9 @@ router.post("/signup", async (req: Request, res: Response) => {
     await db.collection("users").doc(userId).set(newUser);
 
     // Generate email verification link
-    const emailVerificationLink = await auth.generateEmailVerificationLink(email);
+    const emailVerificationLink = await auth.generateEmailVerificationLink(
+      email
+    );
     console.log(`Email verification link generated: ${emailVerificationLink}`);
 
     // Send email using NodeMailer
@@ -178,15 +180,15 @@ router.post("/signup", async (req: Request, res: Response) => {
       userId,
       referralCode: newUser.referralCode,
       aaaBalance: newUser.aaaBalance,
-      token: generateToken(userId, email),
+      token: null,
       walletAddress: newUser.walletAddress,
+      emailVerified: newUser.emailVerified,
     });
   } catch (error) {
     console.error("Signup error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
-
 
 // POST /login
 router.post("/login", async (req: Request, res: Response) => {
@@ -222,7 +224,8 @@ router.post("/login", async (req: Request, res: Response) => {
 
       if (!userRecord.emailVerified) {
         return res.status(403).json({
-          message: "Email not verified. Please verify your email before logging in.",
+          message:
+            "Email not verified. Please verify your email before logging in.",
         });
       }
 
@@ -242,6 +245,7 @@ router.post("/login", async (req: Request, res: Response) => {
         referrals: userData?.referrals,
         token: generateToken(userId, email),
         walletAddress: userData?.walletAddress,
+        emailVerified: userData?.emailVerified,
       });
     } else if (walletAddress) {
       // Authenticate with wallet address
@@ -251,7 +255,9 @@ router.post("/login", async (req: Request, res: Response) => {
         .get();
 
       if (userSnapshot.empty) {
-        return res.status(404).json({ message: "Wallet address not registered" });
+        return res
+          .status(404)
+          .json({ message: "Wallet address not registered" });
       }
 
       const userDoc = userSnapshot.docs[0];
@@ -262,7 +268,8 @@ router.post("/login", async (req: Request, res: Response) => {
 
       if (!userRecord.emailVerified) {
         return res.status(403).json({
-          message: "Email not verified. Please verify your email before logging in.",
+          message:
+            "Email not verified. Please verify your email before logging in.",
         });
       }
 
@@ -271,7 +278,9 @@ router.post("/login", async (req: Request, res: Response) => {
         await db.collection("users").doc(userDoc.id).update({
           emailVerified: true,
         });
-        console.log(`Email verification status updated for user: ${userDoc.id}`);
+        console.log(
+          `Email verification status updated for user: ${userDoc.id}`
+        );
       }
 
       return res.json({
@@ -282,6 +291,7 @@ router.post("/login", async (req: Request, res: Response) => {
         referrals: userData?.referrals,
         token: generateToken(userDoc.id, userData.email),
         walletAddress: userData?.walletAddress,
+        emailVerified: userData?.emailVerified,
       });
     } else {
       return res.status(400).json({
