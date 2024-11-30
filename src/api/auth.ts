@@ -246,6 +246,7 @@ router.post("/login", async (req: Request, res: Response) => {
         token: generateToken(userId, email),
         walletAddress: userData?.walletAddress,
         emailVerified: userData?.emailVerified,
+        email: userData?.email,
       });
     } else if (walletAddress) {
       // Authenticate with wallet address
@@ -292,6 +293,7 @@ router.post("/login", async (req: Request, res: Response) => {
         token: generateToken(userDoc.id, userData.email),
         walletAddress: userData?.walletAddress,
         emailVerified: userData?.emailVerified,
+        email: userData?.email,
       });
     } else {
       return res.status(400).json({
