@@ -229,7 +229,7 @@ router.post("/login", async (req: Request, res: Response) => {
         });
       }
 
-      // Update Firestore if emailVerified is not set to true
+      // Synchronize Firestore with email verification status
       if (!userData?.emailVerified) {
         await db.collection("users").doc(userId).update({
           emailVerified: true,
@@ -237,16 +237,23 @@ router.post("/login", async (req: Request, res: Response) => {
         console.log(`Email verification status updated for user: ${userId}`);
       }
 
+      // Reload updated user data
+      const updatedUserSnapshot = await db
+        .collection("users")
+        .doc(userId)
+        .get();
+      const updatedUserData = updatedUserSnapshot.data();
+
       return res.json({
         message: "Login successful",
         userId,
-        referralCode: userData?.referralCode,
-        aaaBalance: userData?.aaaBalance,
-        referrals: userData?.referrals,
+        referralCode: updatedUserData?.referralCode,
+        aaaBalance: updatedUserData?.aaaBalance,
+        referrals: updatedUserData?.referrals,
         token: generateToken(userId, email),
-        walletAddress: userData?.walletAddress,
-        emailVerified: userData?.emailVerified,
-        email: userData?.email,
+        walletAddress: updatedUserData?.walletAddress,
+        emailVerified: updatedUserData?.emailVerified,
+        email: updatedUserData?.email,
       });
     } else if (walletAddress) {
       // Authenticate with wallet address
@@ -274,7 +281,7 @@ router.post("/login", async (req: Request, res: Response) => {
         });
       }
 
-      // Update Firestore if emailVerified is not set to true
+      // Synchronize Firestore with email verification status
       if (!userData?.emailVerified) {
         await db.collection("users").doc(userDoc.id).update({
           emailVerified: true,
@@ -284,16 +291,23 @@ router.post("/login", async (req: Request, res: Response) => {
         );
       }
 
+      // Reload updated user data
+      const updatedUserSnapshot = await db
+        .collection("users")
+        .doc(userDoc.id)
+        .get();
+      const updatedUserData = updatedUserSnapshot.data();
+
       return res.json({
         message: "Login successful",
         userId: userDoc.id,
-        referralCode: userData?.referralCode,
-        aaaBalance: userData?.aaaBalance,
-        referrals: userData?.referrals,
-        token: generateToken(userDoc.id, userData.email),
-        walletAddress: userData?.walletAddress,
-        emailVerified: userData?.emailVerified,
-        email: userData?.email,
+        referralCode: updatedUserData?.referralCode,
+        aaaBalance: updatedUserData?.aaaBalance,
+        referrals: updatedUserData?.referrals,
+        token: generateToken(userDoc.id, updatedUserData?.email || ""),
+        walletAddress: updatedUserData?.walletAddress,
+        emailVerified: updatedUserData?.emailVerified,
+        email: updatedUserData?.email,
       });
     } else {
       return res.status(400).json({
