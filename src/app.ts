@@ -31,7 +31,7 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false, // Disable if you don't serve all resources over HTTPS or have cross-origin dependencies not serving COEP headers
 }));
 const corsOptions = {
-  origin: "https://aaa-test-env.vercel.app",
+  origin: "https://algoairdropadopt.vercel.app",
   optionsSuccessStatus: 200,
 };
 app.use(cors(corsOptions));
