@@ -34,7 +34,7 @@ router.post("/signup", async (req: Request, res: Response) => {
 
   // Validate origin
   const origin = req.get("origin");
-  if (origin !== "https://algoairdropadopt.vercel.app") {
+  if (origin !== "https://algoadoptairdrop.vercel.app") {
     return res.status(403).json({ success: false, message: "Forbidden" });
   }
 
@@ -195,7 +195,7 @@ router.post("/login", async (req: Request, res: Response) => {
   const { email, password, walletAddress } = req.body;
 
   const origin = req.get("origin");
-  if (origin !== "https://algoairdropadopt.vercel.app") {
+  if (origin !== "https://algoadoptairdrop.vercel.app") {
     return res.status(403).json({ success: false, message: "Forbidden" });
   }
 
