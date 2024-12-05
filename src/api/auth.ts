@@ -30,7 +30,7 @@ const generateToken = (userId: string, email: string) => {
 
 // POST /signup
 router.post("/signup", async (req: Request, res: Response) => {
-  const { email, password, referralCode, walletAddress } = req.body;
+  const { email, password, referralCode } = req.body;
 
   // Validate origin
   const origin = req.get("origin");
@@ -42,24 +42,8 @@ router.post("/signup", async (req: Request, res: Response) => {
     return res.status(400).json({ message: "Email and password are required" });
   }
 
-  if (!walletAddress) {
-    return res.status(400).json({ message: "Wallet address is required" });
-  }
 
   try {
-    // Check if walletAddress is already in use
-    const walletCheckSnapshot = await db
-      .collection("users")
-      .where("walletAddress", "==", walletAddress)
-      .get();
-
-    if (!walletCheckSnapshot.empty) {
-      console.log("Wallet address already in use");
-      return res
-        .status(400)
-        .json({ message: "This wallet address is already in use." });
-    }
-
     // Validate referral code if provided
     let referredBy = GENESIS_REFERRAL_CODE;
 
@@ -90,7 +74,7 @@ router.post("/signup", async (req: Request, res: Response) => {
 
     const newUser = {
       email,
-      walletAddress, // Store wallet address
+      walletAddress: null, // Store wallet address
       referralCode: generatedReferralCode,
       referredBy,
       aaaBalance: 5,
