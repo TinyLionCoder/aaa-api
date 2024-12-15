@@ -44,6 +44,18 @@ router.post("/payouts/monthly", async (req: Request, res: Response) => {
 
         if (payoutAmount > 0 && userWalletAddress) {
           try {
+            const hasOptedIn = await algodClient
+              .accountInformation(userWalletAddress)
+              .do();
+            const optedIn = hasOptedIn.assets.some(
+              (asset: any) => asset["asset-id"] === parseInt("2004387843", 10)
+            );
+
+            if (!optedIn) {
+              console.error(`User ${userId} has not opted into the ASA.`);
+              continue; // Skip this user
+            }
+
             // Create and send Algorand transaction
             const suggestedParams = await algodClient
               .getTransactionParams()
