@@ -54,7 +54,7 @@ router.post("/payouts/monthly", async (req: Request, res: Response) => {
                 from: senderAddress,
                 to: userWalletAddress,
                 assetIndex: parseInt("2004387843", 10), // ASA ID
-                amount: payoutAmount, // Convert to microAlgos
+                amount: Number(payoutAmount),
                 suggestedParams,
               });
 
