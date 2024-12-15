@@ -82,7 +82,7 @@ router.post("/payouts/monthly", async (req: Request, res: Response) => {
               await payoutRef.update({
                 payouts: admin.firestore.FieldValue.arrayUnion({
                   payoutAmount,
-                  txId: "test",
+                  txId,
                   timestamp: admin.firestore.Timestamp.now(),
                 }),
               });
@@ -93,7 +93,7 @@ router.post("/payouts/monthly", async (req: Request, res: Response) => {
                 payouts: [
                   {
                     payoutAmount,
-                    txId: "test",
+                    txId,
                     timestamp: admin.firestore.Timestamp.now(),
                   },
                 ],
