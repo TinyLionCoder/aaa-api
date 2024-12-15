@@ -10,7 +10,10 @@ const router = express.Router();
 const GENESIS_REFERRAL_CODE = "GENESIS";
 
 router.post("/payouts/monthly", async (req: Request, res: Response) => {
+  req.setTimeout(0); // Disable timeout for this request
+
   const { password } = req.body;
+
   if (password === process.env.PAYOUT_PASSWORD) {
     try {
       const senderMnemonic = process.env.SENDER_MNEMONIC; // Use a secure method to retrieve this
@@ -66,7 +69,8 @@ router.post("/payouts/monthly", async (req: Request, res: Response) => {
                 from: senderAddress,
                 to: userWalletAddress,
                 assetIndex: parseInt("2004387843", 10), // ASA ID
-                amount: Number(payoutAmount),
+                amount: Number(payoutAmount) * 10000000000,
+                note: new Uint8Array(Buffer.from("AAA APP: AAA Payment")),
                 suggestedParams,
               });
 
