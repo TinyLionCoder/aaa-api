@@ -36,99 +36,108 @@ router.post("/payouts/monthly", async (req: Request, res: Response) => {
         return res.status(404).json({ message: "No users found for payouts." });
       }
 
-      const payouts = [];
+      const payouts: any = [];
+      const BATCH_SIZE = 10; // Number of users to process in each batch
 
-      for (const userDoc of usersSnapshot.docs) {
-        const userData = userDoc.data();
-        const userId = userDoc.id;
+      for (let i = 0; i < usersSnapshot.docs.length; i += BATCH_SIZE) {
+        const batch = usersSnapshot.docs.slice(i, i + BATCH_SIZE);
 
-        const payoutAmount = userData.aaaBalance || 0;
-        const userWalletAddress = userData.walletAddress;
+        // Process users in the batch concurrently
+        await Promise.all(
+          batch.map(async (userDoc) => {
+            const userData = userDoc.data();
+            const userId = userDoc.id;
 
-        if (payoutAmount > 0 && userWalletAddress) {
-          try {
-            const hasOptedIn = await algodClient
-              .accountInformation(userWalletAddress)
-              .do();
-            const optedIn = hasOptedIn.assets.some(
-              (asset: any) => asset["asset-id"] === parseInt("2004387843", 10)
-            );
+            const payoutAmount = userData.aaaBalance || 0;
+            const userWalletAddress = userData.walletAddress;
 
-            if (!optedIn) {
-              console.error(`User ${userId} has not opted into the ASA.`);
-              continue; // Skip this user
-            }
+            if (payoutAmount > 0 && userWalletAddress) {
+              try {
+                const hasOptedIn = await algodClient
+                  .accountInformation(userWalletAddress)
+                  .do();
+                const optedIn = hasOptedIn.assets.some(
+                  (asset: any) =>
+                    asset["asset-id"] === parseInt("2004387843", 10)
+                );
 
-            // Create and send Algorand transaction
-            const suggestedParams = await algodClient
-              .getTransactionParams()
-              .do();
+                if (!optedIn) {
+                  console.error(`User ${userId} has not opted into the ASA.`);
+                  return; // Skip this user
+                }
 
-            const txn =
-              algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
-                from: senderAddress,
-                to: userWalletAddress,
-                assetIndex: parseInt("2004387843", 10), // ASA ID
-                amount: Number(payoutAmount) * 10000000000,
-                note: new Uint8Array(Buffer.from("AAA APP: AAA Payment")),
-                suggestedParams,
-              });
+                // Create and send Algorand transaction
+                const suggestedParams = await algodClient
+                  .getTransactionParams()
+                  .do();
 
-            // Sign transaction
-            const signedTxn = txn.signTxn(senderAccount.sk);
+                const txn =
+                  algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
+                    from: senderAddress,
+                    to: userWalletAddress,
+                    assetIndex: parseInt("2004387843", 10), // ASA ID
+                    amount: Number(payoutAmount) * 10000000000,
+                    note: new Uint8Array(Buffer.from("AAA APP: AAA Payment")),
+                    suggestedParams,
+                  });
 
-            // Send transaction
-            const { txId } = await algodClient
-              .sendRawTransaction(signedTxn)
-              .do();
+                // Sign transaction
+                const signedTxn = txn.signTxn(senderAccount.sk);
 
-            console.log(`Transaction sent for user ${userId}: ${txId}`);
+                // Send transaction
+                const { txId } = await algodClient
+                  .sendRawTransaction(signedTxn)
+                  .do();
 
-            // Wait for confirmation
-            await algosdk.waitForConfirmation(algodClient, txId, 4);
+                console.log(`Transaction sent for user ${userId}: ${txId}`);
 
-            console.log(`Transaction confirmed for user ${userId}`);
+                // Wait for confirmation
+                await algosdk.waitForConfirmation(algodClient, txId, 4);
 
-            // Check if the payout document already exists
-            const payoutRef = db.collection("payouts").doc(userId);
-            const payoutDoc = await payoutRef.get();
+                console.log(`Transaction confirmed for user ${userId}`);
 
-            if (payoutDoc.exists) {
-              // Update existing payout list
-              await payoutRef.update({
-                payouts: admin.firestore.FieldValue.arrayUnion({
+                // Check if the payout document already exists
+                const payoutRef = db.collection("payouts").doc(userId);
+                const payoutDoc = await payoutRef.get();
+
+                if (payoutDoc.exists) {
+                  // Update existing payout list
+                  await payoutRef.update({
+                    payouts: admin.firestore.FieldValue.arrayUnion({
+                      payoutAmount,
+                      txId,
+                      timestamp: admin.firestore.Timestamp.now(),
+                    }),
+                  });
+                } else {
+                  // Create a new document for the user
+                  await payoutRef.set({
+                    userId,
+                    payouts: [
+                      {
+                        payoutAmount,
+                        txId,
+                        timestamp: admin.firestore.Timestamp.now(),
+                      },
+                    ],
+                  });
+                }
+
+                // Update user balance
+                const userRef = db.collection("users").doc(userId);
+                await userRef.update({ aaaBalance: 0 });
+
+                payouts.push({
+                  userId,
                   payoutAmount,
                   txId,
-                  timestamp: admin.firestore.Timestamp.now(),
-                }),
-              });
-            } else {
-              // Create a new document for the user
-              await payoutRef.set({
-                userId,
-                payouts: [
-                  {
-                    payoutAmount,
-                    txId,
-                    timestamp: admin.firestore.Timestamp.now(),
-                  },
-                ],
-              });
+                });
+              } catch (error) {
+                console.error(`Failed transaction for user ${userId}:`, error);
+              }
             }
-
-            // Update user balance
-            const userRef = db.collection("users").doc(userId);
-            await userRef.update({ aaaBalance: 0 });
-
-            payouts.push({
-              userId,
-              payoutAmount,
-              txId,
-            });
-          } catch (error) {
-            console.error(`Failed transaction for user ${userId}:`, error);
-          }
-        }
+          })
+        );
       }
 
       res.status(200).json({
@@ -139,6 +148,8 @@ router.post("/payouts/monthly", async (req: Request, res: Response) => {
       console.error("Error processing monthly payouts:", error);
       res.status(500).json({ message: "Internal server error" });
     }
+  } else {
+    res.status(401).json({ message: "Unauthorized" });
   }
 });
 
