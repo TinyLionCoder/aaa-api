@@ -159,11 +159,13 @@ router.post("/payouts/monthly", async (req: Request, res: Response) => {
  */
 router.get("/payouts/total/:userId", async (req: Request, res: Response) => {
   const { userId } = req.params;
-  const { password } = req.body;
-
-  if (password !== process.env.PAYOUT_PASSWORD) {
-    return res.status(401).json({ message: "Unauthorized" });
+  
+  // Validate origin
+  const origin = req.get("origin");
+  if (origin !== "https://algoadoptairdrop.vercel.app") {
+    return res.status(403).json({ success: false, message: "Forbidden" });
   }
+
 
   try {
     // Retrieve the user's payouts document
