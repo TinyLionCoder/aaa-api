@@ -3,8 +3,6 @@ import { db, auth } from "../config/firebase"; // Firebase Auth and Firestore
 import jwt from "jsonwebtoken";
 import admin from "firebase-admin";
 import axios from "axios";
-import nodemailer from "nodemailer";
-import { google } from "googleapis";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -14,14 +12,6 @@ const GENESIS_REFERRAL_CODE = "GENESIS";
 // Firebase REST API URL for sign-in
 const FIREBASE_AUTH_URL = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${process.env.FIREBASE_API_KEY}`;
 const docmunetPath = process.env.DOCUMENT_PATH || "default_document_path";
-
-// Google OAuth2 setup for Gmail
-const oAuth2Client = new google.auth.OAuth2(
-  process.env.CLIENT_ID,
-  process.env.CLIENT_SECRET,
-  process.env.REDIRECT_URI
-);
-oAuth2Client.setCredentials({ refresh_token: process.env.REFRESH_TOKEN });
 
 // Generate JWT for user sessions
 const generateToken = (userId: string, email: string) => {
@@ -41,7 +31,6 @@ router.post("/signup", async (req: Request, res: Response) => {
   if (!email || !password) {
     return res.status(400).json({ message: "Email and password are required" });
   }
-
 
   try {
     // Validate referral code if provided
@@ -80,45 +69,11 @@ router.post("/signup", async (req: Request, res: Response) => {
       aaaBalance: 5,
       referrals: [],
       lastWithdrawalDate: null,
-      emailVerified: false, // Add this field to track verification status
+      verified: false, // Add this field to track verification status
     };
 
     // Add new user to Firestore
     await db.collection("users").doc(userId).set(newUser);
-
-    // Generate email verification link
-    const emailVerificationLink = await auth.generateEmailVerificationLink(
-      email
-    );
-    console.log(`Email verification link generated: ${emailVerificationLink}`);
-
-    // Send email using NodeMailer
-    const accessToken = await oAuth2Client.getAccessToken();
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        type: "OAuth2",
-        user: process.env.EMAIL_USER,
-        clientId: process.env.CLIENT_ID,
-        clientSecret: process.env.CLIENT_SECRET,
-        refreshToken: process.env.REFRESH_TOKEN,
-        accessToken: accessToken.token || "",
-      },
-    });
-
-    const mailOptions = {
-      from: `AAA App <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "Verify Your Email for AAA App",
-      html: `
-        <p>Welcome to the AAA App!</p>
-        <p>Click the link below to verify your email address:</p>
-        <a href="${emailVerificationLink}">Verify Email</a>
-      `,
-    };
-
-    await transporter.sendMail(mailOptions);
-    console.log(`Verification email sent to: ${email}`);
 
     // Always update the Genesis user
     const genesisRef = db.collection("users").doc(docmunetPath);
@@ -166,7 +121,7 @@ router.post("/signup", async (req: Request, res: Response) => {
       aaaBalance: newUser.aaaBalance,
       token: null,
       walletAddress: newUser.walletAddress,
-      emailVerified: newUser.emailVerified,
+      verified: newUser.verified,
     });
   } catch (error) {
     console.error("Signup error:", error);
@@ -201,26 +156,6 @@ router.post("/login", async (req: Request, res: Response) => {
         return res.status(404).json({ message: "User not found in Firestore" });
       }
 
-      const userData = userSnapshot.data();
-
-      // Check if email is verified in Firebase Auth
-      const userRecord = await auth.getUser(userId);
-
-      if (!userRecord.emailVerified) {
-        return res.status(403).json({
-          message:
-            "Email not verified. Please verify your email before logging in.",
-        });
-      }
-
-      // Synchronize Firestore with email verification status
-      if (!userData?.emailVerified) {
-        await db.collection("users").doc(userId).update({
-          emailVerified: true,
-        });
-        console.log(`Email verification status updated for user: ${userId}`);
-      }
-
       // Reload updated user data
       const updatedUserSnapshot = await db
         .collection("users")
@@ -236,7 +171,7 @@ router.post("/login", async (req: Request, res: Response) => {
         referrals: updatedUserData?.referrals,
         token: generateToken(userId, email),
         walletAddress: updatedUserData?.walletAddress,
-        emailVerified: updatedUserData?.emailVerified,
+        verified: updatedUserData?.verified,
         email: updatedUserData?.email,
       });
     } else if (walletAddress) {
@@ -253,27 +188,6 @@ router.post("/login", async (req: Request, res: Response) => {
       }
 
       const userDoc = userSnapshot.docs[0];
-      const userData = userDoc.data();
-
-      // Check if email is verified in Firebase Auth
-      const userRecord = await auth.getUser(userDoc.id);
-
-      if (!userRecord.emailVerified) {
-        return res.status(403).json({
-          message:
-            "Email not verified. Please verify your email before logging in.",
-        });
-      }
-
-      // Synchronize Firestore with email verification status
-      if (!userData?.emailVerified) {
-        await db.collection("users").doc(userDoc.id).update({
-          emailVerified: true,
-        });
-        console.log(
-          `Email verification status updated for user: ${userDoc.id}`
-        );
-      }
 
       // Reload updated user data
       const updatedUserSnapshot = await db
@@ -290,7 +204,7 @@ router.post("/login", async (req: Request, res: Response) => {
         referrals: updatedUserData?.referrals,
         token: generateToken(userDoc.id, updatedUserData?.email || ""),
         walletAddress: updatedUserData?.walletAddress,
-        emailVerified: updatedUserData?.emailVerified,
+        verified: updatedUserData?.verified,
         email: updatedUserData?.email,
       });
     } else {
