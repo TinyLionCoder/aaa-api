@@ -21,6 +21,17 @@ router.post("/verify", async (req: Request, res: Response) => {
       return res.status(404).json({ message: "User not found in Firestore" });
     }
 
+    const userData = userSnapshot.data();
+    const dbWalletAddress = userData?.walletAddress;
+
+    // Check if wallet address matches the one in the database
+    if (dbWalletAddress && dbWalletAddress !== walletAddress) {
+      return res.status(400).json({
+        message: "Wallet address mismatch. Please set up the correct wallet.",
+        newWalletAddress: walletAddress,
+      });
+    }
+
     // Verify the transaction fee payment
     const isFeeTXVerified = await verifyFeeTX(walletAddress, txId);
 
