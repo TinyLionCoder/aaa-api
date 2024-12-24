@@ -3,7 +3,7 @@ import { algoIndexerClient } from "../config";
 export const verifyFeeTX = async (walletAddress: string, txId: string) => {
   const expectedAmount = 500000; // 0.5 Algo in microAlgos
   const expectedRecipient =
-    "SJDMEUSIKIU4LIJIMH4F7ZVMJOGF6PO4RNTPLISOVBLG6LOPG4HMWGVIKU"; // Replace with your recipient wallet address
+    "HE7225SD6ZKYO45QWYCE4BZ3ITFEK7WI7XGMAVAMB56FZREJVPMHNRSL2E"; // Replace with your recipient wallet address
 
   try {
     // Fetch transaction details from the indexer
