@@ -117,7 +117,7 @@ router.post("/signup", async (req: Request, res: Response) => {
     res.status(201).json({
       message: "Signup successful. Please verify your email.",
       userId,
-      referralCode: newUser.referralCode,
+      referralCode: null,
       aaaBalance: newUser.aaaBalance,
       token: null,
       walletAddress: newUser.walletAddress,
@@ -166,7 +166,7 @@ router.post("/login", async (req: Request, res: Response) => {
       return res.json({
         message: "Login successful",
         userId,
-        referralCode: updatedUserData?.referralCode,
+        referralCode: updatedUserData?.verified ? updatedUserData?.referralCode : null,
         aaaBalance: updatedUserData?.aaaBalance,
         referrals: updatedUserData?.referrals,
         token: generateToken(userId, email),
@@ -199,7 +199,7 @@ router.post("/login", async (req: Request, res: Response) => {
       return res.json({
         message: "Login successful",
         userId: userDoc.id,
-        referralCode: updatedUserData?.referralCode,
+        referralCode: updatedUserData?.verified ? updatedUserData?.referralCode : null,
         aaaBalance: updatedUserData?.aaaBalance,
         referrals: updatedUserData?.referrals,
         token: generateToken(userDoc.id, updatedUserData?.email || ""),
