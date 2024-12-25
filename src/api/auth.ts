@@ -34,24 +34,7 @@ router.post("/signup", async (req: Request, res: Response) => {
   }
 
   try {
-    // Validate referral code if provided
-    let referredBy = GENESIS_REFERRAL_CODE;
-
-    if (referralCode && referralCode.trim() !== "") {
-      const referrerSnapshot = await db
-        .collection("users")
-        .where("referralCode", "==", referralCode.trim())
-        .get();
-
-      if (!referrerSnapshot.empty) {
-        const referrerDoc = referrerSnapshot.docs[0];
-        referredBy = referrerDoc.id; // Use the userId of the referrer
-      } else {
-        return res.status(400).json({ message: "Invalid referral code" });
-      }
-    }
-
-    // Create user in Firebase Authentication
+    // Create user in Firebase Authentication (outside the transaction)
     const userRecord = await auth.createUser({
       email,
       password,
@@ -60,71 +43,88 @@ router.post("/signup", async (req: Request, res: Response) => {
     const userId = userRecord.uid; // Firebase UID
     const generatedReferralCode = uuidv4();
 
-    console.log(`Referral Code Provided: ${referralCode || "None"}`);
-    console.log(`Referred By Determined: ${referredBy}`);
+    let referredBy = GENESIS_REFERRAL_CODE;
 
-    const newUser = {
-      email,
-      walletAddress: null, // Store wallet address
-      referralCode: generatedReferralCode,
-      referredBy,
-      aaaBalance: 5,
-      referrals: [],
-      lastWithdrawalDate: null,
-      verified: false, // Add this field to track verification status
-    };
+    // Start Firestore transaction
+    await db.runTransaction(async (transaction) => {
+      // Validate referral code
+      if (referralCode && referralCode.trim() !== "") {
+        const referrerSnapshot = await db
+          .collection("users")
+          .where("referralCode", "==", referralCode.trim())
+          .get();
 
-    // Add new user to Firestore
-    await db.collection("users").doc(userId).set(newUser);
+        if (!referrerSnapshot.empty) {
+          const referrerDoc = referrerSnapshot.docs[0];
+          referredBy = referrerDoc.id; // Use the userId of the referrer
+        } else {
+          throw new Error("Invalid referral code");
+        }
+      }
 
-    // Always update the Genesis user
-    const genesisRef = db.collection("users").doc(docmunetPath);
-    await genesisRef.update({
-      aaaBalance: admin.firestore.FieldValue.increment(5),
-      referrals: admin.firestore.FieldValue.arrayUnion(userId),
-    });
+      // Prepare the new user data
+      const newUser = {
+        email,
+        walletAddress: null,
+        referralCode: generatedReferralCode,
+        referredBy,
+        aaaBalance: 5,
+        referrals: [],
+        lastWithdrawalDate: null,
+        verified: false,
+      };
 
-    // Multi-level referral logic: Update up to 5 levels of referrers
-    let currentReferrer = referredBy;
-    for (let level = 0; level < 5; level++) {
-      if (currentReferrer === GENESIS_REFERRAL_CODE) break;
+      // Add new user
+      const newUserRef = db.collection("users").doc(userId);
+      transaction.set(newUserRef, newUser);
 
-      const referrerSnapshot = await db
-        .collection("users")
-        .doc(currentReferrer)
-        .get();
+      // Update Genesis user balance and referrals
+      const genesisRef = db.collection("users").doc(docmunetPath);
+      transaction.update(genesisRef, {
+        aaaBalance: admin.firestore.FieldValue.increment(5),
+        referrals: admin.firestore.FieldValue.arrayUnion(userId),
+      });
 
-      if (!referrerSnapshot.exists) break;
+      // Multi-level referral logic: Update up to 5 levels
+      let currentReferrer = referredBy;
+      for (let level = 0; level < 5; level++) {
+        if (currentReferrer === GENESIS_REFERRAL_CODE) break;
 
-      const referrerData = referrerSnapshot.data();
+        const referrerRef = db.collection("users").doc(currentReferrer);
+        const referrerSnapshot = await referrerRef.get();
 
-      await db
-        .collection("users")
-        .doc(currentReferrer)
-        .update({
+        if (!referrerSnapshot.exists) break;
+
+        const referrerData = referrerSnapshot.data();
+
+        // Update referrer
+        transaction.update(referrerRef, {
           aaaBalance: admin.firestore.FieldValue.increment(5),
           referrals: admin.firestore.FieldValue.arrayUnion(userId),
         });
 
-      currentReferrer = referrerData?.referredBy || GENESIS_REFERRAL_CODE;
-    }
+        currentReferrer = referrerData?.referredBy || GENESIS_REFERRAL_CODE;
+      }
+    });
 
     console.log(
       `Signup completed for user: ${userId}, referredBy: ${referredBy}`
     );
 
     res.status(201).json({
-      message: "Signup successful. Please verify your email.",
+      message: "Signup successful. Please login to continue",
       userId,
       referralCode: null,
-      aaaBalance: newUser.aaaBalance,
+      aaaBalance: 5,
       token: null,
-      walletAddress: newUser.walletAddress,
-      verified: newUser.verified,
+      walletAddress: null,
+      verified: false,
     });
   } catch (error) {
     console.error("Signup error:", error);
-    res.status(500).json({ message: "Internal server error" });
+    const errorMessage =
+      error instanceof Error ? error.message : "Internal server error";
+    res.status(500).json({ message: errorMessage });
   }
 });
 
