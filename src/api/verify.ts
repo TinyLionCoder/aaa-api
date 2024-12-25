@@ -14,44 +14,46 @@ router.post("/verify", async (req: Request, res: Response) => {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
 
-    // Retrieve user data from Firestore
-    const userSnapshot = await db.collection("users").doc(userId).get();
+    // Firestore transaction for concurrency-safe updates
+    await db.runTransaction(async (transaction) => {
+      const userRef = db.collection("users").doc(userId);
+      const userSnapshot = await transaction.get(userRef);
 
-    if (!userSnapshot.exists) {
-      return res.status(404).json({ message: "User not found in Firestore" });
-    }
+      if (!userSnapshot.exists) {
+        throw new Error("User not found in Firestore");
+      }
 
-    const userData = userSnapshot.data();
-    const dbWalletAddress = userData?.walletAddress;
+      const userData = userSnapshot.data();
+      const dbWalletAddress = userData?.walletAddress;
 
-    // Check if wallet address matches the one in the database
-    if (dbWalletAddress && dbWalletAddress !== walletAddress) {
-      return res.status(400).json({
-        message: "Wallet address mismatch. Please set up the correct wallet.",
-        newWalletAddress: walletAddress,
+      // Check if the user is already verified
+      if (userData?.verified) {
+        throw new Error("User is already verified");
+      }
+
+      // Check wallet address mismatch
+      if (dbWalletAddress && dbWalletAddress !== walletAddress) {
+        throw new Error("Wallet address mismatch. Please set up the correct wallet.");
+      }
+
+      // Verify the transaction fee payment
+      const isFeeTXVerified = await verifyFeeTX(walletAddress, txId);
+      if (!isFeeTXVerified) {
+        throw new Error("Verification failed. Invalid or missing fee payment.");
+      }
+
+      // Update user's verification status
+      transaction.update(userRef, {
+        verified: true,
       });
-    }
-
-    // Verify the transaction fee payment
-    const isFeeTXVerified = await verifyFeeTX(walletAddress, txId);
-
-    if (!isFeeTXVerified) {
-      return res
-        .status(400)
-        .json({
-          message: "Verification failed. Invalid or missing fee payment.",
-        });
-    }
-
-    // Update user's verification status in Firestore
-    await db.collection("users").doc(userId).update({
-      verified: true,
     });
 
     return res.status(200).json({ message: "User verified successfully!" });
   } catch (error) {
     console.error("Error verifying user:", error);
-    res.status(500).json({ message: "Internal server error." });
+    const errorMessage =
+      error instanceof Error ? error.message : "Internal server error";
+    return res.status(400).json({ message: errorMessage });
   }
 });
 
