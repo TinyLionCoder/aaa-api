@@ -3,6 +3,7 @@ import { db, auth } from "../config/firebase"; // Firebase Auth and Firestore
 import jwt from "jsonwebtoken";
 import admin from "firebase-admin";
 import axios from "axios";
+import { v4 as uuidv4 } from "uuid";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -43,7 +44,8 @@ router.post("/signup", async (req: Request, res: Response) => {
         .get();
 
       if (!referrerSnapshot.empty) {
-        referredBy = referralCode.trim();
+        const referrerDoc = referrerSnapshot.docs[0];
+        referredBy = referrerDoc.id; // Use the userId of the referrer
       } else {
         return res.status(400).json({ message: "Invalid referral code" });
       }
@@ -56,7 +58,7 @@ router.post("/signup", async (req: Request, res: Response) => {
     });
 
     const userId = userRecord.uid; // Firebase UID
-    const generatedReferralCode = userId;
+    const generatedReferralCode = uuidv4();
 
     console.log(`Referral Code Provided: ${referralCode || "None"}`);
     console.log(`Referred By Determined: ${referredBy}`);
@@ -89,25 +91,22 @@ router.post("/signup", async (req: Request, res: Response) => {
 
       const referrerSnapshot = await db
         .collection("users")
-        .where("referralCode", "==", currentReferrer)
+        .doc(currentReferrer)
         .get();
 
-      if (referrerSnapshot.empty) break;
+      if (!referrerSnapshot.exists) break;
 
-      const referrerDoc = referrerSnapshot.docs[0];
-      const referrerId = referrerDoc.id;
+      const referrerData = referrerSnapshot.data();
 
-      // Update the referrer's balance and referrals array
       await db
         .collection("users")
-        .doc(referrerId)
+        .doc(currentReferrer)
         .update({
           aaaBalance: admin.firestore.FieldValue.increment(5),
           referrals: admin.firestore.FieldValue.arrayUnion(userId),
         });
 
-      // Move to the next referrer in the chain
-      currentReferrer = referrerDoc.data()?.referredBy || GENESIS_REFERRAL_CODE;
+      currentReferrer = referrerData?.referredBy || GENESIS_REFERRAL_CODE;
     }
 
     console.log(
@@ -166,7 +165,9 @@ router.post("/login", async (req: Request, res: Response) => {
       return res.json({
         message: "Login successful",
         userId,
-        referralCode: updatedUserData?.verified ? updatedUserData?.referralCode : null,
+        referralCode: updatedUserData?.verified
+          ? updatedUserData?.referralCode
+          : null,
         aaaBalance: updatedUserData?.aaaBalance,
         referrals: updatedUserData?.referrals,
         token: generateToken(userId, email),
@@ -199,7 +200,9 @@ router.post("/login", async (req: Request, res: Response) => {
       return res.json({
         message: "Login successful",
         userId: userDoc.id,
-        referralCode: updatedUserData?.verified ? updatedUserData?.referralCode : null,
+        referralCode: updatedUserData?.verified
+          ? updatedUserData?.referralCode
+          : null,
         aaaBalance: updatedUserData?.aaaBalance,
         referrals: updatedUserData?.referrals,
         token: generateToken(userDoc.id, updatedUserData?.email || ""),
