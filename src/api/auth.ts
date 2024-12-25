@@ -33,6 +33,7 @@ router.post("/signup", async (req: Request, res: Response) => {
     return res.status(400).json({ message: "Email and password are required" });
   }
 
+  let userId: string | null = null; // Keep track of user ID for potential deletion
   try {
     // Create user in Firebase Authentication (outside the transaction)
     const userRecord = await auth.createUser({
@@ -40,7 +41,7 @@ router.post("/signup", async (req: Request, res: Response) => {
       password,
     });
 
-    const userId = userRecord.uid; // Firebase UID
+    userId = userRecord.uid; // Firebase UID
     const generatedReferralCode = uuidv4();
 
     let referredBy = GENESIS_REFERRAL_CODE;
@@ -74,7 +75,10 @@ router.post("/signup", async (req: Request, res: Response) => {
         verified: false,
       };
 
-      // Add new user
+      // Add new user to Firestore
+      if (!userId) {
+        throw new Error("User ID is null");
+      }
       const newUserRef = db.collection("users").doc(userId);
       transaction.set(newUserRef, newUser);
 
@@ -122,6 +126,17 @@ router.post("/signup", async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Signup error:", error);
+
+    // Cleanup the created Firebase user if Firestore operations fail
+    if (userId) {
+      try {
+        await auth.deleteUser(userId);
+        console.log(`Deleted user ${userId} due to Firestore error.`);
+      } catch (deleteError) {
+        console.error(`Failed to delete user ${userId}:`, deleteError);
+      }
+    }
+
     const errorMessage =
       error instanceof Error ? error.message : "Internal server error";
     res.status(500).json({ message: errorMessage });
