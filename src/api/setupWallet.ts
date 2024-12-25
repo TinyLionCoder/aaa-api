@@ -24,43 +24,41 @@ router.post("/setup-wallet", async (req: Request, res: Response) => {
   }
 
   try {
-    // Ensure the wallet address is not already in use
-    const walletCheckSnapshot = await db
-      .collection("users")
-      .where("walletAddress", "==", walletAddress)
-      .get();
+    // Use a Firestore transaction to ensure atomic updates
+    await db.runTransaction(async (transaction) => {
+      // Ensure the wallet address is not already in use
+      const walletCheckSnapshot = await db
+        .collection("users")
+        .where("walletAddress", "==", walletAddress)
+        .get();
 
-    if (!walletCheckSnapshot.empty) {
-      const existingUser = walletCheckSnapshot.docs[0];
-      if (existingUser.id !== userId) {
-        return res.status(400).json({
-          message: "This wallet address is already in use by another user.",
-        });
+      if (!walletCheckSnapshot.empty) {
+        const existingUser = walletCheckSnapshot.docs[0];
+        if (existingUser.id !== userId) {
+          throw new Error(
+            "This wallet address is already in use by another user."
+          );
+        }
       }
-    }
 
-    // Get the user's document in Firestore
-    const userRef = db.collection("users").doc(userId);
-    const userSnapshot = await userRef.get();
+      // Get the user's document in Firestore
+      const userRef = db.collection("users").doc(userId);
+      const userSnapshot = await transaction.get(userRef);
 
-    // Check if user exists
-    if (!userSnapshot.exists) {
-      return res.status(404).json({ message: "User not found." });
-    }
+      if (!userSnapshot.exists) {
+        throw new Error("User not found.");
+      }
 
-    const userData = userSnapshot.data();
+      const userData = userSnapshot.data();
 
-    // Check if the wallet address is already the same
-    if (userData?.walletAddress === walletAddress) {
-      return res.status(200).json({
-        message: "Wallet address is already up-to-date.",
-        userId,
-        walletAddress,
-      });
-    }
+      // Check if the wallet address is already the same
+      if (userData?.walletAddress === walletAddress) {
+        throw new Error("Wallet address is already up-to-date.");
+      }
 
-    // Update the wallet address
-    await userRef.update({ walletAddress });
+      // Update the wallet address in Firestore
+      transaction.update(userRef, { walletAddress });
+    });
 
     res.status(200).json({
       message: "Wallet address updated successfully.",
@@ -69,7 +67,8 @@ router.post("/setup-wallet", async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error updating wallet address:", error);
-    res.status(500).json({ message: "Internal server error." });
+    const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    res.status(500).json({ message: errorMessage });
   }
 });
 
