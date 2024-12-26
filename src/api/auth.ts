@@ -104,7 +104,10 @@ router.post("/signup", async (req: Request, res: Response) => {
         // Update referrer
         transaction.update(referrerRef, {
           aaaBalance: admin.firestore.FieldValue.increment(5),
-          referrals: admin.firestore.FieldValue.arrayUnion(userId),
+          referrals: admin.firestore.FieldValue.arrayUnion({
+            level: level + 1,
+            userId, // Add the new user's ID to their parent with level 1
+          }),
         });
 
         currentReferrer = referrerData?.referredBy || GENESIS_REFERRAL_CODE;
