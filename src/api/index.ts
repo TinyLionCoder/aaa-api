@@ -6,6 +6,7 @@ import setupWallet from "./setupWallet";
 import totalMembers from "./totalMembers";
 import payout from "./payout";
 import verify from "./verify";
+import myTeam from "./myTeam";
 
 const router = express.Router();
 
@@ -19,5 +20,6 @@ router.use("/", setupWallet);
 router.use("/", totalMembers);
 router.use("/", payout);
 router.use("/", verify);
+router.use("/", myTeam);
 
 export default router;
