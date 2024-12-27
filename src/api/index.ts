@@ -12,6 +12,7 @@ import {
   apiLimiter,
   strictLimiter,
   moderateLimiter,
+  signupLimiter,
 } from "../helpers/rateLimiters";
 
 const router = express.Router();
@@ -21,7 +22,7 @@ router.get<{}, MessageResponse>("/", (req, res) => {
     message: "API - 👋🌎🌍🌏🌏",
   });
 });
-router.use("/signup", strictLimiter, signup);
+router.use("/signup", signupLimiter, signup);
 router.use("/login", moderateLimiter, login);
 router.use("/config", moderateLimiter, setupWallet);
 router.use("/members", apiLimiter, totalMembers);
