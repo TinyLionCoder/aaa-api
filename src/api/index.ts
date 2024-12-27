@@ -1,12 +1,18 @@
 import express from "express";
 
 import MessageResponse from "../interfaces/MessageResponse";
-import auth from "./auth";
 import setupWallet from "./setupWallet";
 import totalMembers from "./totalMembers";
 import payout from "./payout";
 import verify from "./verify";
 import myTeam from "./myTeam";
+import signup from "./signup";
+import login from "./login";
+import {
+  apiLimiter,
+  strictLimiter,
+  moderateLimiter,
+} from "../helpers/rateLimiters";
 
 const router = express.Router();
 
@@ -15,11 +21,12 @@ router.get<{}, MessageResponse>("/", (req, res) => {
     message: "API - 👋🌎🌍🌏🌏",
   });
 });
-router.use("/", auth);
-router.use("/", setupWallet);
-router.use("/", totalMembers);
-router.use("/", payout);
-router.use("/", verify);
-router.use("/", myTeam);
+router.use("/signup", strictLimiter, signup);
+router.use("/login", moderateLimiter, login);
+router.use("/config", moderateLimiter, setupWallet);
+router.use("/members", apiLimiter, totalMembers);
+router.use("/pay", moderateLimiter, payout);
+router.use("/verify", strictLimiter, verify);
+router.use("/referrals", moderateLimiter, myTeam);
 
 export default router;
