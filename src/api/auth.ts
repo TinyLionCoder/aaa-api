@@ -16,7 +16,7 @@ const docmunetPath = process.env.DOCUMENT_PATH || "default_document_path";
 
 // Generate JWT for user sessions
 const generateToken = (userId: string, email: string) => {
-  return jwt.sign({ userId, email }, "your_secret_key", { expiresIn: "1h" });
+  return jwt.sign({ userId, email }, `${process.env.JWT_SECRET_KEY}`, { expiresIn: "1h" });
 };
 
 // POST /signup

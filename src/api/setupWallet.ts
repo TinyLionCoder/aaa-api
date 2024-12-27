@@ -1,5 +1,6 @@
 import express, { Request, Response } from "express";
 import { db } from "../config/firebase";
+import { verifyOriginAndJWT } from "../helpers/verifyOriginandJWT";
 
 const router = express.Router();
 
@@ -8,12 +9,11 @@ const router = express.Router();
  * Updates the wallet address for a given user, ensuring the address is unique.
  */
 router.post("/setup-wallet", async (req: Request, res: Response) => {
-  const { userId, walletAddress } = req.body;
+  const { userId, email, walletAddress } = req.body;
 
-  // Validate origin
-  const origin = req.get("origin");
-  if (origin !== "https://algoadoptairdrop.vercel.app") {
-    return res.status(403).json({ success: false, message: "Forbidden" });
+  const isValidRequest = verifyOriginAndJWT(req, email, userId);
+  if (!isValidRequest) {
+    return res.status(403).json({ message: "Forbidden" });
   }
 
   // Validate input
@@ -67,7 +67,8 @@ router.post("/setup-wallet", async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error updating wallet address:", error);
-    const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    const errorMessage =
+      error instanceof Error ? error.message : "Internal server error";
     res.status(500).json({ message: errorMessage });
   }
 });

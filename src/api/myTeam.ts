@@ -1,5 +1,6 @@
 import express, { Request, Response } from "express";
 import { db } from "../config/firebase";
+import { verifyOriginAndJWT } from "../helpers/verifyOriginandJWT";
 
 const router = express.Router();
 
@@ -8,11 +9,11 @@ const router = express.Router();
  * Retrieves the count of referrals grouped by level for a given user.
  */
 router.post("/my-team", async (req: Request, res: Response) => {
-  const { userId } = req.body;
+  const { userId, email } = req.body;
 
-  const origin = req.get("origin");
-  if (origin !== "https://algoadoptairdrop.vercel.app") {
-    return res.status(403).json({ success: false, message: "Forbidden" });
+  const isValidRequest = verifyOriginAndJWT(req, email, userId);
+  if (!isValidRequest) {
+    return res.status(403).json({ message: "Forbidden" });
   }
 
   if (!userId) {

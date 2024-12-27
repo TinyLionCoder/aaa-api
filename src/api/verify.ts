@@ -1,17 +1,17 @@
 import express, { Request, Response } from "express";
 import { db } from "../config/firebase";
 import { verifyFeeTX } from "../algorand/transactionHelpers/verifyFeeTX";
+import { verifyOriginAndJWT } from "../helpers/verifyOriginandJWT";
 
 const router = express.Router();
 
 router.post("/verify", async (req: Request, res: Response) => {
-  const { userId, walletAddress, txId } = req.body;
+  const { userId, email, walletAddress, txId } = req.body;
 
   try {
-    // Validate origin (Optional: Remove or modify based on your needs)
-    const origin = req.get("origin");
-    if (origin !== "https://algoadoptairdrop.vercel.app") {
-      return res.status(403).json({ success: false, message: "Forbidden" });
+    const isValidRequest = verifyOriginAndJWT(req, email, userId);
+    if (!isValidRequest) {
+      return res.status(403).json({ message: "Forbidden" });
     }
 
     // Firestore transaction for concurrency-safe updates
