@@ -8,6 +8,7 @@ import verify from "./verify";
 import myTeam from "./myTeam";
 import signup from "./signup";
 import login from "./login";
+import getUserDetails from "./getUserDetails";
 import {
   apiLimiter,
   strictLimiter,
@@ -24,6 +25,7 @@ router.get<{}, MessageResponse>("/", (req, res) => {
 });
 router.use("/signup", signupLimiter, signup);
 router.use("/login", moderateLimiter, login);
+router.use("/userDetails", moderateLimiter, getUserDetails);
 router.use("/config", moderateLimiter, setupWallet);
 router.use("/members", apiLimiter, totalMembers);
 router.use("/pay", moderateLimiter, payout);
