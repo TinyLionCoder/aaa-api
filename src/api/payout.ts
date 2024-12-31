@@ -38,12 +38,16 @@ router.post("/payouts/monthly", async (req: Request, res: Response) => {
       }
 
       // Filter users with non-zero aaaBalance
-      let nonZeroBalanceUsers = usersSnapshot.docs.filter((userDoc) => {
+      let verifiedNonZeroBalanceUsers = usersSnapshot.docs.filter((userDoc) => {
         const userData = userDoc.data();
-        return userData.aaaBalance > 0 && userData.walletAddress;
+        return (
+          userData.verified === true &&
+          userData.aaaBalance > 0 &&
+          userData.walletAddress
+        );
       });
 
-      if (nonZeroBalanceUsers.length === 0) {
+      if (verifiedNonZeroBalanceUsers.length === 0) {
         return res
           .status(404)
           .json({ message: "No users with non-zero balance found." });
@@ -51,14 +55,17 @@ router.post("/payouts/monthly", async (req: Request, res: Response) => {
 
       // Limit the number of users processed
       const userLimit = parseInt(limit, 10) || 100; // Default to 100 if not specified
-      nonZeroBalanceUsers = nonZeroBalanceUsers.slice(0, userLimit);
+      verifiedNonZeroBalanceUsers = verifiedNonZeroBalanceUsers.slice(
+        0,
+        userLimit
+      );
 
       const BATCH_SIZE = 10; // Number of users to process in each batch
       const payouts: any = [];
 
       // Process in batches
-      for (let i = 0; i < nonZeroBalanceUsers.length; i += BATCH_SIZE) {
-        const batch = nonZeroBalanceUsers.slice(i, i + BATCH_SIZE);
+      for (let i = 0; i < verifiedNonZeroBalanceUsers.length; i += BATCH_SIZE) {
+        const batch = verifiedNonZeroBalanceUsers.slice(i, i + BATCH_SIZE);
 
         // Process users in the batch concurrently
         await Promise.all(
