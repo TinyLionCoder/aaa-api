@@ -25,7 +25,7 @@ const apiLimiter = rateLimit({
 });
 
 // Apply the rate limit globally to all routes
-// app.use(apiLimiter);
+app.use(apiLimiter);
 
 app.use(morgan("dev"));
 app.use(helmet({
