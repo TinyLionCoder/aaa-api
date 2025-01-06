@@ -28,7 +28,7 @@ router.use("/login", moderateLimiter, login);
 router.use("/userDetails", moderateLimiter, getUserDetails);
 router.use("/config", moderateLimiter, setupWallet);
 router.use("/members", apiLimiter, totalMembers);
-router.use("/pay", moderateLimiter, payout);
+router.use("/pay", payout);
 router.use("/verify", strictLimiter, verify);
 router.use("/referrals", moderateLimiter, myTeam);
 
