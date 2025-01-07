@@ -131,7 +131,7 @@ router.post("/update-claimed-address", async (req: Request, res: Response) => {
         address,
         Number(data.amountOfTokenPerClaim),
         data.tokenId,
-        data.tokenDecimals
+        Number(data.tokenDecimals)
       );
 
       transaction.update(airdropCollectionRef.doc(docId), {
