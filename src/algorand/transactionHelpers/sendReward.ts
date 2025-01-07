@@ -1,7 +1,12 @@
 import algosdk from "algosdk";
 import { algodClient } from "../config";
 
-export async function sendRewards(to: any, amount: number, assetId: number) {
+export async function sendRewards(
+  to: any,
+  amount: number,
+  assetId: number,
+  decimals: number
+) {
   try {
     // Input validation
     if (!algosdk.isValidAddress(to)) {
@@ -17,7 +22,7 @@ export async function sendRewards(to: any, amount: number, assetId: number) {
       from: airdropProviderAccount.addr,
       to,
       assetIndex: assetId, // Asset ID for ASA
-      amount: Number(amount),
+      amount: Number(amount) * Math.pow(10, decimals),
       note: new Uint8Array(Buffer.from(`AAA App: ${assetId} Airdrop`)),
       suggestedParams,
     });

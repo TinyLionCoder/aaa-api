@@ -13,6 +13,7 @@ router.post("/create-airdrop", async (req: Request, res: Response) => {
     email,
     tokenName,
     tokenId,
+    tokenDecimals,
     amountOfTokenPerClaim,
     totalAmountOfTokens,
   } = req.body;
@@ -28,6 +29,7 @@ router.post("/create-airdrop", async (req: Request, res: Response) => {
     if (
       !tokenName ||
       !tokenId ||
+      !tokenDecimals ||
       !amountOfTokenPerClaim ||
       !totalAmountOfTokens ||
       amountOfTokenPerClaim <= 0 ||
@@ -60,6 +62,7 @@ router.post("/create-airdrop", async (req: Request, res: Response) => {
         email,
         tokenName,
         tokenId,
+        tokenDecimals,
         amountOfTokenPerClaim,
         totalAmountOfTokens,
         totalAmountOfTokensClaimed: 0,
@@ -118,11 +121,18 @@ router.post("/update-claimed-address", async (req: Request, res: Response) => {
       }
 
       if (data.totalAmountOfTokensClaimed >= data.totalAmountOfTokens) {
-        transaction.update(airdropCollectionRef.doc(docId), { completed: true });
+        transaction.update(airdropCollectionRef.doc(docId), {
+          completed: true,
+        });
         throw new Error("Airdrop is fully claimed");
       }
 
-      await sendRewards(address, Number(data.amountOfTokenPerClaim), data.tokenId);
+      await sendRewards(
+        address,
+        Number(data.amountOfTokenPerClaim),
+        data.tokenId,
+        data.tokenDecimals
+      );
 
       transaction.update(airdropCollectionRef.doc(docId), {
         claimedAddresses: admin.firestore.FieldValue.arrayUnion(address),
@@ -140,6 +150,5 @@ router.post("/update-claimed-address", async (req: Request, res: Response) => {
     return res.status(500).json({ message: errorMessage });
   }
 });
-
 
 export default router;
