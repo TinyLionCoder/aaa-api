@@ -9,6 +9,7 @@ import myTeam from "./myTeam";
 import signup from "./signup";
 import login from "./login";
 import getUserDetails from "./getUserDetails";
+import createAirdrop from "./airdrop";
 import {
   apiLimiter,
   strictLimiter,
@@ -31,5 +32,6 @@ router.use("/members", apiLimiter, totalMembers);
 router.use("/pay", moderateLimiter, payout);
 router.use("/verify", strictLimiter, verify);
 router.use("/referrals", moderateLimiter, myTeam);
+router.use("/airdrop", moderateLimiter, createAirdrop);
 
 export default router;
