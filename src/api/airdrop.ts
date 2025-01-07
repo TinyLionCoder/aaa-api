@@ -50,6 +50,8 @@ router.post("/create-airdrop", async (req: Request, res: Response) => {
         throw new Error("An active airdrop already exists for this token");
       }
 
+      await optIn(tokenId);
+
       const currentDate = new Date().toISOString();
       const docId = `${tokenName}-${currentDate}`;
 
