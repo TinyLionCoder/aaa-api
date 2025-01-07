@@ -9,7 +9,7 @@ const router = express.Router();
 router.post("/create-airdrop", async (req: Request, res: Response) => {
   const { userId, email, tokenName, tokenId, amountOfTokenPerClaim } = req.body;
 
-  //Verify request origin and JWT
+  // Verify request origin and JWT
   const isValidRequest = verifyOriginAndJWT(req, email, userId);
   if (!isValidRequest) {
     return res.status(403).json({ message: "Forbidden" });
@@ -21,25 +21,31 @@ router.post("/create-airdrop", async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Invalid request data" });
     }
 
-    // Opt-in to the token
-    await optIn(tokenId);
-
+    // Check for an existing active airdrop with the same tokenName
     const airdropCollectionRef = db.collection("airdrops");
-    const currentDate = new Date().toISOString();
-    const docId = `${tokenName}-${currentDate}`;
+    const existingAirdropQuery = await airdropCollectionRef
+      .where("tokenName", "==", tokenName)
+      .where("completed", "==", false)
+      .limit(1)
+      .get();
 
-    // Check if the document already exists
-    const docRef = airdropCollectionRef.doc(docId);
-    const docSnapshot = await docRef.get();
-
-    if (docSnapshot.exists) {
+    if (!existingAirdropQuery.empty) {
       return res.status(400).json({
-        message: "Airdrop already exists for the given token and date",
+        message: "An active airdrop already exists for this token",
       });
     }
 
+    // Opt-in to the token (external function)
+    await optIn(tokenId);
+
+    // Generate a unique document ID using tokenName and current date
+    const currentDate = new Date().toISOString();
+    const docId = `${tokenName}-${currentDate}`;
+
     // Create a new airdrop document
     const newAirdrop = {
+      userId,
+      email,
       tokenName,
       tokenId,
       amountOfTokenPerClaim,
@@ -48,6 +54,7 @@ router.post("/create-airdrop", async (req: Request, res: Response) => {
       createdAt: admin.firestore.Timestamp.fromDate(new Date()), // Add timestamp for better tracking
     };
 
+    const docRef = airdropCollectionRef.doc(docId);
     await docRef.set(newAirdrop);
 
     res.status(201).json({
@@ -61,6 +68,7 @@ router.post("/create-airdrop", async (req: Request, res: Response) => {
     res.status(500).json({ message: errorMessage });
   }
 });
+
 
 router.post("/update-claimed-address", async (req: Request, res: Response) => {
   const { userId, email, tokenName, address } = req.body;
