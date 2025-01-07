@@ -54,9 +54,7 @@ router.post("/login", async (req: Request, res: Response) => {
       return res.json({
         message: "Login successful",
         userId,
-        referralCode: updatedUserData?.verified
-          ? updatedUserData?.referralCode
-          : null,
+        referralCode: updatedUserData?.referralCode,
         aaaBalance: updatedUserData?.aaaBalance,
         referrals: updatedUserData?.referrals,
         token: generateToken(userId, email),
@@ -89,9 +87,7 @@ router.post("/login", async (req: Request, res: Response) => {
       return res.json({
         message: "Login successful",
         userId: userDoc.id,
-        referralCode: updatedUserData?.verified
-          ? updatedUserData?.referralCode
-          : null,
+        referralCode: updatedUserData?.referralCode,
         aaaBalance: updatedUserData?.aaaBalance,
         referrals: updatedUserData?.referrals,
         token: generateToken(userDoc.id, updatedUserData?.email || ""),
