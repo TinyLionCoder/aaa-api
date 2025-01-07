@@ -1,8 +1,7 @@
 import algosdk from "algosdk";
-
 import { algodClient } from "../config";
-// import { autoOptOutRewardedAsset } from "../opt-out.js";
-export async function sendRewards(to: any, amount: any, assetId: any) {
+
+export async function sendRewards(to: any, amount: number, assetId: number) {
   try {
     // Input validation
     if (!algosdk.isValidAddress(to)) {
@@ -10,42 +9,23 @@ export async function sendRewards(to: any, amount: any, assetId: any) {
     }
 
     const suggestedParams = await algodClient.getTransactionParams().do();
-    const mnemonic = process.env.MNEMONIC;
-    const rewardProviderAccount = algosdk.mnemonicToSecretKey(`${mnemonic}`);
+    const mnemonic = process.env.AIRDROP_MNEMONIC;
+    const airdropProviderAccount = algosdk.mnemonicToSecretKey(`${mnemonic}`);
 
-    let txn;
-    if (assetId === "0" || assetId === "") {
-      // Sending ALGO
-      txn = algosdk.makePaymentTxnWithSuggestedParams(
-        rewardProviderAccount.addr,
-        to,
-        amount,
-        undefined, // closeRemainderTo
-        // @ts-ignore
-        algosdk.encodeObj("Tiny Dick Lion's Den: Congrats!"),
-        suggestedParams
-      );
-    } else {
-      // Sending ASA
-      txn = algosdk.makeAssetTransferTxnWithSuggestedParams(
-        rewardProviderAccount.addr,
-        to,
-        undefined, // closeRemainderTo
-        undefined, // revocationTarget
-        amount,
-        // @ts-ignore
-        algosdk.encodeObj("Tiny Dick Lion's Den: Congrats! 🦁"),
-        parseInt(assetId, 10), // Asset ID for ASA
-        suggestedParams
-      );
-    }
+    // Sending ASA
+    const txn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
+      from: airdropProviderAccount.addr,
+      to,
+      assetIndex: assetId, // Asset ID for ASA
+      amount: Number(amount),
+      note: new Uint8Array(Buffer.from(`AAA App: ${assetId} Airdrop`)),
+      suggestedParams,
+    });
 
-    const signedTxn = algosdk.signTransaction(txn, rewardProviderAccount.sk);
+    const signedTxn = algosdk.signTransaction(txn, airdropProviderAccount.sk);
     const txConfirmation = await algodClient
       .sendRawTransaction(signedTxn.blob)
       .do();
-
-    // await autoOptOutRewardedAsset(assetId);
 
     console.log("Transaction ID:", txConfirmation.txId);
     return txConfirmation;

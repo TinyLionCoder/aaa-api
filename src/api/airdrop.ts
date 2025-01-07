@@ -2,12 +2,20 @@ import express, { Request, Response } from "express";
 import { db } from "../config/firebase";
 import admin from "firebase-admin";
 import { optIn } from "../algorand/opt-in";
+import { sendRewards } from "../algorand/transactionHelpers/sendReward";
 import { verifyOriginAndJWT } from "../helpers/verifyOriginandJWT";
 
 const router = express.Router();
 
 router.post("/create-airdrop", async (req: Request, res: Response) => {
-  const { userId, email, tokenName, tokenId, amountOfTokenPerClaim } = req.body;
+  const {
+    userId,
+    email,
+    tokenName,
+    tokenId,
+    amountOfTokenPerClaim,
+    totalAmountOfTokens,
+  } = req.body;
 
   // Verify request origin and JWT
   const isValidRequest = verifyOriginAndJWT(req, email, userId);
@@ -16,51 +24,53 @@ router.post("/create-airdrop", async (req: Request, res: Response) => {
   }
 
   try {
-    // Ensure input validation
-    if (!tokenName || !tokenId || !amountOfTokenPerClaim) {
+    // Validate input
+    if (
+      !tokenName ||
+      !tokenId ||
+      !amountOfTokenPerClaim ||
+      !totalAmountOfTokens ||
+      amountOfTokenPerClaim <= 0 ||
+      totalAmountOfTokens <= 0 ||
+      totalAmountOfTokens < amountOfTokenPerClaim
+    ) {
       return res.status(400).json({ message: "Invalid request data" });
     }
 
-    // Check for an existing active airdrop with the same tokenName
-    const airdropCollectionRef = db.collection("airdrops");
-    const existingAirdropQuery = await airdropCollectionRef
-      .where("tokenName", "==", tokenName)
-      .where("completed", "==", false)
-      .limit(1)
-      .get();
+    await db.runTransaction(async (transaction) => {
+      const airdropCollectionRef = db.collection("airdrops");
+      const existingAirdropQuery = await transaction.get(
+        airdropCollectionRef
+          .where("tokenName", "==", tokenName)
+          .where("completed", "==", false)
+          .limit(1)
+      );
 
-    if (!existingAirdropQuery.empty) {
-      return res.status(400).json({
-        message: "An active airdrop already exists for this token",
-      });
-    }
+      if (!existingAirdropQuery.empty) {
+        throw new Error("An active airdrop already exists for this token");
+      }
 
-    // Opt-in to the token (external function)
-    await optIn(tokenId);
+      const currentDate = new Date().toISOString();
+      const docId = `${tokenName}-${currentDate}`;
 
-    // Generate a unique document ID using tokenName and current date
-    const currentDate = new Date().toISOString();
-    const docId = `${tokenName}-${currentDate}`;
+      const newAirdrop = {
+        userId,
+        email,
+        tokenName,
+        tokenId,
+        amountOfTokenPerClaim,
+        totalAmountOfTokens,
+        totalAmountOfTokensClaimed: 0,
+        completed: false,
+        claimedAddresses: [],
+        createdAt: admin.firestore.Timestamp.fromDate(new Date()),
+      };
 
-    // Create a new airdrop document
-    const newAirdrop = {
-      userId,
-      email,
-      tokenName,
-      tokenId,
-      amountOfTokenPerClaim,
-      completed: false,
-      claimedAddresses: [],
-      createdAt: admin.firestore.Timestamp.fromDate(new Date()), // Add timestamp for better tracking
-    };
-
-    const docRef = airdropCollectionRef.doc(docId);
-    await docRef.set(newAirdrop);
-
-    res.status(201).json({
-      message: "Airdrop created successfully",
-      airdropId: docId,
+      const docRef = airdropCollectionRef.doc(docId);
+      transaction.set(docRef, newAirdrop);
     });
+
+    res.status(201).json({ message: "Airdrop created successfully" });
   } catch (error) {
     console.error("Error creating airdrop:", error);
     const errorMessage =
@@ -68,7 +78,6 @@ router.post("/create-airdrop", async (req: Request, res: Response) => {
     res.status(500).json({ message: errorMessage });
   }
 });
-
 
 router.post("/update-claimed-address", async (req: Request, res: Response) => {
   const { userId, email, tokenName, address } = req.body;
@@ -80,33 +89,48 @@ router.post("/update-claimed-address", async (req: Request, res: Response) => {
   }
 
   try {
-    // Query the airdrops collection to find the active document
+    if (!address || !tokenName) {
+      return res.status(400).json({ message: "Invalid request data" });
+    }
+
     const airdropCollectionRef = db.collection("airdrops");
-    const querySnapshot = await airdropCollectionRef
-      .where("tokenName", "==", tokenName)
-      .where("completed", "==", false)
-      .limit(1)
-      .get();
 
-    if (querySnapshot.empty) {
-      return res.status(404).json({ message: "No active airdrop found for this token" });
-    }
+    await db.runTransaction(async (transaction) => {
+      const querySnapshot = await transaction.get(
+        airdropCollectionRef
+          .where("tokenName", "==", tokenName)
+          .where("completed", "==", false)
+          .limit(1)
+      );
 
-    const doc = querySnapshot.docs[0];
-    const docId = doc.id;
-    const data = doc.data();
+      if (querySnapshot.empty) {
+        throw new Error("No active airdrop found for this token");
+      }
 
-    // Check if the address is already in the claimedAddresses array
-    if (data.claimedAddresses && data.claimedAddresses.includes(address)) {
-      return res.status(400).json({ message: "Address already claimed" });
-    }
+      const doc = querySnapshot.docs[0];
+      const docId = doc.id;
+      const data = doc.data();
 
-    // Update the document to add the new address
-    await db.collection("airdrops").doc(docId).update({
-      claimedAddresses: admin.firestore.FieldValue.arrayUnion(address),
+      if (data.claimedAddresses && data.claimedAddresses.includes(address)) {
+        throw new Error("Address already claimed");
+      }
+
+      if (data.totalAmountOfTokensClaimed >= data.totalAmountOfTokens) {
+        transaction.update(airdropCollectionRef.doc(docId), { completed: true });
+        throw new Error("Airdrop is fully claimed");
+      }
+
+      await sendRewards(address, Number(data.amountOfTokenPerClaim), data.tokenId);
+
+      transaction.update(airdropCollectionRef.doc(docId), {
+        claimedAddresses: admin.firestore.FieldValue.arrayUnion(address),
+        totalAmountOfTokensClaimed: admin.firestore.FieldValue.increment(
+          data.amountOfTokenPerClaim
+        ),
+      });
     });
 
-    return res.status(200).json({ message: "Address added to claimed list" });
+    res.status(200).json({ message: "Address added to claimed list" });
   } catch (error) {
     console.error("Error updating claimed address:", error);
     const errorMessage =
