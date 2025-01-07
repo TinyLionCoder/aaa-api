@@ -120,13 +120,15 @@ router.post("/update-claimed-address", async (req: Request, res: Response) => {
         throw new Error("Address already claimed");
       }
 
-      if (data.totalAmountOfTokensClaimed >= data.totalAmountOfTokens) {
-        transaction.update(airdropCollectionRef.doc(docId), {
-          completed: true,
-        });
-        throw new Error("Airdrop is fully claimed");
+      const remainingTokens =
+        data.totalAmountOfTokens - data.totalAmountOfTokensClaimed;
+
+      // Check if this claim will deplete all tokens
+      if (remainingTokens < data.amountOfTokenPerClaim) {
+        throw new Error("Not enough tokens remaining for this claim");
       }
 
+      // Send rewards
       await sendRewards(
         address,
         Number(data.amountOfTokenPerClaim),
@@ -134,11 +136,17 @@ router.post("/update-claimed-address", async (req: Request, res: Response) => {
         Number(data.tokenDecimals)
       );
 
+      const newTotalClaimed =
+        data.totalAmountOfTokensClaimed + data.amountOfTokenPerClaim;
+
+      // Update document in transaction
       transaction.update(airdropCollectionRef.doc(docId), {
         claimedAddresses: admin.firestore.FieldValue.arrayUnion(address),
         totalAmountOfTokensClaimed: admin.firestore.FieldValue.increment(
           data.amountOfTokenPerClaim
         ),
+        // Mark as completed if this claim depletes the tokens
+        completed: newTotalClaimed >= data.totalAmountOfTokens,
       });
     });
 
@@ -150,5 +158,6 @@ router.post("/update-claimed-address", async (req: Request, res: Response) => {
     return res.status(500).json({ message: errorMessage });
   }
 });
+
 
 export default router;
