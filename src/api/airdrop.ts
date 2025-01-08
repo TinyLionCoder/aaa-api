@@ -16,6 +16,7 @@ router.post("/create-airdrop", async (req: Request, res: Response) => {
     tokenDecimals,
     amountOfTokenPerClaim,
     totalAmountOfTokens,
+    shortDescription,
   } = req.body;
 
   // Verify request origin and JWT
@@ -34,7 +35,10 @@ router.post("/create-airdrop", async (req: Request, res: Response) => {
       !totalAmountOfTokens ||
       amountOfTokenPerClaim <= 0 ||
       totalAmountOfTokens <= 0 ||
-      totalAmountOfTokens < amountOfTokenPerClaim
+      totalAmountOfTokens < amountOfTokenPerClaim ||
+      !shortDescription ||
+      shortDescription?.length < 0 ||
+      shortDescription?.length > 100
     ) {
       return res.status(400).json({ message: "Invalid request data" });
     }
@@ -66,6 +70,7 @@ router.post("/create-airdrop", async (req: Request, res: Response) => {
         amountOfTokenPerClaim,
         totalAmountOfTokens,
         totalAmountOfTokensClaimed: 0,
+        shortDescription,
         completed: false,
         claimedAddresses: [],
         createdAt: admin.firestore.Timestamp.fromDate(new Date()),
@@ -181,6 +186,7 @@ router.post("/get-airdrops", async (req: Request, res: Response) => {
       id: doc.id,
       tokenName: doc.data().tokenName,
       tokenId: doc.data().tokenId,
+      shortDescription: doc.data().shortDescription,
       // ...doc.data(),
     }));
 
