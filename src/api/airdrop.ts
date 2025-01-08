@@ -159,5 +159,39 @@ router.post("/update-claimed-address", async (req: Request, res: Response) => {
   }
 });
 
+router.post("/get-airdrops", async (req: Request, res: Response) => {
+  const { userId, email } = req.body;
+  
+  // Verify user identity
+  const isValidRequest = verifyOriginAndJWT(req, email, userId);
+  if (!isValidRequest) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  try {
+    const airdropCollectionRef = db.collection("airdrops");
+    const querySnapshot = await airdropCollectionRef
+      .where("completed", "==", false)
+      .get();
+
+    if (querySnapshot.empty) {
+      return res.status(404).json({ message: "No active airdrop found" });
+    }
+
+    const airdrops = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      tokenName: doc.data().tokenName,
+      tokenId: doc.data().tokenId,
+      // ...doc.data(),
+    }));
+
+    res.status(200).json(airdrops);
+  } catch (error) {
+    console.error("Error fetching airdrop:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Internal server error";
+    return res.status(500).json({ message: errorMessage });
+  }
+});
 
 export default router;
