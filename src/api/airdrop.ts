@@ -160,12 +160,11 @@ router.post("/update-claimed-address", async (req: Request, res: Response) => {
 });
 
 router.post("/get-airdrops", async (req: Request, res: Response) => {
-  const { userId, email } = req.body;
   
   // Verify user identity
-  const isValidRequest = verifyOriginAndJWT(req, email, userId);
-  if (!isValidRequest) {
-    return res.status(403).json({ message: "Forbidden" });
+  const origin = req.get("origin");
+  if (origin !== "https://algoadoptairdrop.vercel.app") {
+    return res.status(403).json({ success: false, message: "Forbidden" });
   }
 
   try {
