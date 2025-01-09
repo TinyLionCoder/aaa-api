@@ -31,6 +31,12 @@ router.post("/verify", async (req: Request, res: Response) => {
         throw new Error("User is already verified");
       }
 
+      if (!dbWalletAddress) {
+        throw new Error(
+          "Wallet address not set. Please set up your wallet before verification."
+        );
+      }
+
       // Check wallet address mismatch
       if (dbWalletAddress && dbWalletAddress !== walletAddress) {
         throw new Error("Wallet address mismatch. Please set up the correct wallet.");
