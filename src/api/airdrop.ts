@@ -38,7 +38,7 @@ router.post("/create-airdrop", async (req: Request, res: Response) => {
       totalAmountOfTokens < amountOfTokenPerClaim ||
       !shortDescription ||
       shortDescription?.length < 0 ||
-      shortDescription?.length > 100
+      shortDescription?.length > 200
     ) {
       return res.status(400).json({ message: "Invalid request data" });
     }
