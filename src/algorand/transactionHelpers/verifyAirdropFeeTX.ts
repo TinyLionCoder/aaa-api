@@ -1,7 +1,7 @@
 import { algoIndexerClient } from "../config";
 
 export const verifyAirdropFeeTX = async (txId: string) => {
-  const expectedAmount = 1000000; // 10 Algo in microAlgos
+  const expectedAmount = 10000000; // 10 Algo in microAlgos
   const expectedRecipient =
     "HE7225SD6ZKYO45QWYCE4BZ3ITFEK7WI7XGMAVAMB56FZREJVPMHNRSL2E"; // Replace with your recipient wallet address
 
