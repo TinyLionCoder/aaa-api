@@ -14,6 +14,7 @@ function chunkArray<T>(array: T[], chunkSize: number): T[][] {
 }
 
 router.post("/send", async (req: Request, res: Response) => {
+  req.setTimeout(0); // Disable request timeout
   try {
     // Example request body: { "assetId": 12345, "amount": 10, "decimals": 0 }
     const { assetId, amount, decimals } = req.body;
