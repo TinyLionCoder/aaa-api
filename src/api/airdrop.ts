@@ -4,6 +4,7 @@ import admin from "firebase-admin";
 import { optIn } from "../algorand/opt-in";
 import { sendRewards } from "../algorand/transactionHelpers/sendReward";
 import { verifyOriginAndJWT } from "../helpers/verifyOriginandJWT";
+import { verifyAirdropFeeTX } from "../algorand/transactionHelpers/verifyAirdropFeeTX";
 
 const router = express.Router();
 
@@ -17,6 +18,7 @@ router.post("/create-airdrop", async (req: Request, res: Response) => {
     amountOfTokenPerClaim,
     totalAmountOfTokens,
     shortDescription,
+    txId,
   } = req.body;
 
   // Verify request origin and JWT
@@ -38,11 +40,18 @@ router.post("/create-airdrop", async (req: Request, res: Response) => {
       totalAmountOfTokens < amountOfTokenPerClaim ||
       !shortDescription ||
       shortDescription?.length < 0 ||
-      shortDescription?.length > 200
+      shortDescription?.length > 200 ||
+      !txId
     ) {
       return res.status(400).json({ message: "Invalid request data" });
     }
 
+    const feePaid = await verifyAirdropFeeTX(txId);
+
+    if (!feePaid) {
+      return res.status(400).json({ message: "Invalid fee transaction" });
+    }
+    
     await db.runTransaction(async (transaction) => {
       const airdropCollectionRef = db.collection("airdrops");
       const existingAirdropQuery = await transaction.get(
