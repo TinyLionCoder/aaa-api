@@ -25,6 +25,7 @@ router.get<{}, MessageResponse>("/", (req, res) => {
     message: "API - 👋🌎🌍🌏🌏",
   });
 });
+//routes
 router.use("/signup", signupLimiter, signup);
 router.use("/login", moderateLimiter, login);
 router.use("/userDetails", moderateLimiter, getUserDetails);
