@@ -134,6 +134,18 @@ router.post("/update-claimed-address", async (req: Request, res: Response) => {
         throw new Error("Address already claimed");
       }
 
+      const updatedUserSnapshot = await db
+        .collection("users")
+        .doc(userId)
+        .get();
+      const updatedUserData = updatedUserSnapshot.data();
+
+      if (`${address}`.trim() !== updatedUserData?.walletAddress) {
+        throw new Error(
+          "You can only claim tokens with your registered wallet address"
+        );
+      }
+
       const remainingTokens =
         data.totalAmountOfTokens - data.totalAmountOfTokensClaimed;
 
