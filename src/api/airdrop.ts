@@ -32,7 +32,8 @@ router.post("/create-airdrop", async (req: Request, res: Response) => {
     if (
       !tokenName ||
       !tokenId ||
-      !tokenDecimals ||
+      tokenDecimals == null ||
+      tokenDecimals < 0 ||
       !amountOfTokenPerClaim ||
       !totalAmountOfTokens ||
       amountOfTokenPerClaim <= 0 ||
