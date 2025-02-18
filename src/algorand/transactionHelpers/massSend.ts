@@ -25,7 +25,7 @@ export async function massSend(
       amount: Number(amount) * Math.pow(10, decimals),
       note: new Uint8Array(
         Buffer.from(
-          "AAA APP: All Verified members of https://algoadoptairdrop.vercel.app will receive their available balance on the first week of every month"
+          "AAA APP: Airdrop from our #freecoop post"
         )
       ),
       suggestedParams,
