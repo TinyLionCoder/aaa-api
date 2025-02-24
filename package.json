@@ -1,5 +1,5 @@
 {
-  "name": "tdld-api-ts",
+  "name": "aaa-api-ts",
   "version": "1.0.0",
   "description": " A basic starter for an express.js API with Typescript",
   "main": "src/index.ts",
@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "keywords": [],
-  "author": "tdld",
+  "author": "aaa",
   "license": "MIT",
   "dependencies": {
     "@tinymanorg/tinyman-js-sdk": "^4.0.5",
