@@ -4,6 +4,7 @@ import admin from "firebase-admin";
 import { algodClient } from "../algorand/config"; // Algorand client config
 import algosdk from "algosdk";
 import dotenv from "dotenv";
+import { verifyOriginAndJWT } from "../helpers/verifyOriginandJWT";
 dotenv.config();
 
 const router = express.Router();
@@ -181,13 +182,12 @@ router.post("/payouts/monthly", async (req: Request, res: Response) => {
  */
 router.get("/payouts/total/:userId", async (req: Request, res: Response) => {
   const { userId } = req.params;
-  
+
   // Validate origin
   const origin = req.get("origin");
   if (origin !== "https://algoadoptairdrop.vercel.app") {
     return res.status(403).json({ success: false, message: "Forbidden" });
   }
-
 
   try {
     // Retrieve the user's payouts document
@@ -222,4 +222,92 @@ router.get("/payouts/total/:userId", async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /get-ready-for-payout
+ */
+router.post("/get-ready-for-payout", async (req: Request, res: Response) => {
+  const { userId, email } = req.body;
+
+  const isValidRequest = verifyOriginAndJWT(req, email, userId);
+  if (!isValidRequest) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  if (!userId) {
+    return res.status(400).json({ message: "User ID is required" });
+  }
+
+  try {
+    // Fetch the user's data from Firestore
+    const userSnapshot = await db.collection("users").doc(userId).get();
+
+    if (!userSnapshot.exists) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    const userData = userSnapshot.data();
+    const verifiedMembers = await getVerifiedMembers(userId);
+    const lastVerifiedCount = userData?.lastVerifiedCount;
+    const verifiedCount = lastVerifiedCount || verifiedMembers || 0;
+
+    if (verifiedCount === 0) {
+      return res.status(200).json({
+        message: "No referrals found.",
+        verifiedCount,
+      });
+    }
+
+    if (verifiedCount === lastVerifiedCount) {
+      return res.status(200).json({
+        message: "No new referrals found.",
+        verifiedCount,
+      });
+    }
+
+    if (verifiedCount > lastVerifiedCount) {
+      return res.status(200).json({
+        message: "New referrals found.",
+        verifiedCount: verifiedMembers - (lastVerifiedCount || 0),
+      });
+    }
+
+    return res.status(200).json({
+      message: "Defaulted",
+      verifiedCount,
+    });
+  } catch (error) {
+    console.error("Error fetching user team:", error);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
 export default router;
+
+export async function getVerifiedMembers(userId: any) {
+  const userSnapshot = await db.collection("users").doc(userId).get();
+  if (!userSnapshot.exists) return 0;
+
+  const userData = userSnapshot.data();
+  const referrals = userData?.referrals || [];
+
+  if (referrals.length === 0) return 0;
+
+  const referralIds = referrals.map((referral: any) => referral.userId);
+
+  let verifiedCount = 0;
+  const chunkSize = 30;
+  for (let i = 0; i < referralIds.length; i += chunkSize) {
+    const batchIds = referralIds.slice(i, i + chunkSize);
+
+    const referralSnapshots = await db
+      .collection("users")
+      .where(admin.firestore.FieldPath.documentId(), "in", batchIds)
+      .get();
+
+    referralSnapshots.forEach((doc) => {
+      const referralData = doc.data();
+      if (referralData.verified) verifiedCount++;
+    });
+  }
+  return verifiedCount;
+}
