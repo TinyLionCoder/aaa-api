@@ -175,17 +175,13 @@ async function getVerifiedMembers(userId) {
   // Fetch user data
   const userSnapshot = await db.collection("users").doc(userId).get();
   if (!userSnapshot.exists) {
-    return res.status(404).json({ message: "User not found." });
+    throw new Error(`User ${userId} not found.`);
   }
-
   const userData = userSnapshot.data();
   const referrals = userData?.referrals || [];
 
   if (referrals.length === 0) {
-    return res.status(200).json({
-      message: "No referrals found.",
-      verifiedMembers: 0,
-    });
+    return 0;
   }
 
   const referralIds = referrals.map((referral) => referral.userId);
