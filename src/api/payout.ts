@@ -285,6 +285,66 @@ router.post("/get-ready-for-payout", async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /payouts/current/:userId
+ * Calculates the user's current payout.
+ */
+router.post("/payouts/current/:userId", async (req: Request, res: Response) => {
+  const { userId, email } = req.params;
+
+  const isValidRequest = verifyOriginAndJWT(req, email, userId);
+  if (!isValidRequest) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  try {
+    // Fetch user data
+    const userSnapshot = await db.collection("users").doc(userId).get();
+    if (!userSnapshot.exists) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    const userData = userSnapshot.data();
+    const aaaBalance = userData?.aaaBalance || 0;
+
+    // Fetch total payout from the payout history
+    const payoutRef = db.collection("payouts").doc(userId);
+    const payoutDoc = await payoutRef.get();
+    const totalPayout = payoutDoc.exists
+      ? payoutDoc
+          .data()
+          ?.payouts.reduce(
+            (sum: number, payout: { payoutAmount: number }) =>
+              sum + payout.payoutAmount,
+            0
+          )
+      : 0;
+
+    // Fetch verified members count
+    const verifiedMembersCount = await getVerifiedMembers(userId);
+    const lastVerifiedCount = userData?.lastVerifiedCount || 0;
+    const newlyVerifiedMembers = verifiedMembersCount - lastVerifiedCount;
+
+    // Calculate current payout
+    // const x = aaaBalance - totalPayout;
+    const y =
+      lastVerifiedCount > 0
+        ? newlyVerifiedMembers * 5
+        : newlyVerifiedMembers * 5 + 5;
+
+    res.status(200).json({
+      userId,
+      aaaBalance,
+      totalPayout,
+      verifiedMembersCount,
+      currentPayout: y > 0 ? y : 0, // Ensure payout is non-negative
+    });
+  } catch (error) {
+    console.error("Error calculating current payout:", error);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
 export default router;
 
 export async function getVerifiedMembers(userId: any) {
