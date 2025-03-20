@@ -254,6 +254,7 @@ router.post("/get-ready-for-payout", async (req: Request, res: Response) => {
       return res.status(200).json({
         message: "No referrals found.",
         verifiedCount,
+        lastVerifiedCount,
       });
     }
 
@@ -261,6 +262,7 @@ router.post("/get-ready-for-payout", async (req: Request, res: Response) => {
       return res.status(200).json({
         message: "No new referrals found.",
         verifiedCount,
+        lastVerifiedCount,
       });
     }
 
@@ -268,12 +270,14 @@ router.post("/get-ready-for-payout", async (req: Request, res: Response) => {
       return res.status(200).json({
         message: "New referrals found.",
         verifiedCount: verifiedMembers - (lastVerifiedCount || 0),
+        lastVerifiedCount,
       });
     }
 
     return res.status(200).json({
       message: "Defaulted",
       verifiedCount,
+      lastVerifiedCount,
     });
   } catch (error) {
     console.error("Error fetching user team:", error);
