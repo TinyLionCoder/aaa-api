@@ -3,11 +3,11 @@ import admin from "firebase-admin";
 import { algodClient } from "../algorand/config"; // Algorand client config
 import algosdk from "algosdk";
 import dotenv from "dotenv";
-dotenv.config();
+dotenv.config({ path: "../../.env" });
 
 const GENESIS_REFERRAL_CODE = "GENESIS";
 
-export async function processMonthlyPayouts(limit) {
+export async function processMonthlyPayouts(limit: any) {
   try {
     const senderMnemonic = process.env.SENDER_MNEMONIC;
     if (!senderMnemonic) throw new Error("Sender mnemonic not configured");
@@ -21,7 +21,10 @@ export async function processMonthlyPayouts(limit) {
       .where("referralCode", "!=", GENESIS_REFERRAL_CODE)
       .get();
 
-    if (usersSnapshot.empty) throw new Error("No users found for payouts.");
+    if (usersSnapshot.empty) {
+      console.log("No users found for payouts.");
+      return { message: "No users found for payouts.", payouts: [] };
+    }
 
     const oneMonthAgo = new Date();
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
@@ -32,47 +35,52 @@ export async function processMonthlyPayouts(limit) {
       const lastPaidDate = userData?.lastPaid?.toDate() || new Date(0);
 
       return (
-        lastPaidDate >= oneMonthAgo && // At least a month ago
+        // lastPaidDate >= oneMonthAgo && // At least a month ago
         userData.verified === true &&
         userData.aaaBalance > 0 &&
         userData.walletAddress
       );
     });
 
-    if (eligibleUsers.length === 0)
-      throw new Error("No users eligible for payouts.");
+    if (eligibleUsers.length === 0) {
+      console.log("No users eligible for payouts.");
+      return { message: "No users eligible for payouts.", payouts: [] };
+    }
 
     const userLimit = parseInt(limit, 10);
     eligibleUsers = eligibleUsers.slice(0, userLimit);
 
     const BATCH_SIZE = 10;
-    const payouts = [];
+    const payouts: any = [];
 
     for (let i = 0; i < eligibleUsers.length; i += BATCH_SIZE) {
       const batch = eligibleUsers.slice(i, i + BATCH_SIZE);
 
       await Promise.all(
         batch.map(async (userDoc) => {
-          const userData = userDoc.data();
-          const userId = userDoc.id;
-          const userWalletAddress = userData.walletAddress;
-
-          const currentVerifiedMembers = await getVerifiedMembers(userId);
-          const lastVerifiedCount = userData?.lastVerifiedCount || 0;
-          const newlyVerifiedMembers =
-            currentVerifiedMembers - lastVerifiedCount;
-
-          if (newlyVerifiedMembers <= 0) return; // Skip if no new verified members
-
-          const payoutAmount = 5 * newlyVerifiedMembers; // 5 tokens per new verified referral
-
           try {
+            const userData = userDoc.data();
+            const userId = userDoc.id;
+            const userWalletAddress = userData.walletAddress;
+
+            const currentVerifiedMembers = await getVerifiedMembers(userId);
+            const lastVerifiedCount = userData?.lastVerifiedCount || 0;
+            const newlyVerifiedMembers =
+              currentVerifiedMembers - lastVerifiedCount;
+
+            if (newlyVerifiedMembers <= 0) {
+              console.log(`User ${userId} has no new verified members.`);
+              return;
+            }
+
+            const payoutAmount = 5 // * newlyVerifiedMembers; // 5 tokens per new verified referral
+
             // Check if user has opted in to AAA ASA
             const hasOptedIn = await algodClient
               .accountInformation(userWalletAddress)
               .do();
             const optedIn = hasOptedIn.assets.some(
-              (asset) => asset["asset-id"] === parseInt("2004387843", 10)
+              (asset: any) => asset["asset-id"] === parseInt("2004387843", 10)
             );
 
             if (!optedIn) {
@@ -130,7 +138,7 @@ export async function processMonthlyPayouts(limit) {
             // Update user balance and last verified count
             const userRef = db.collection("users").doc(userId);
             await userRef.update({
-              aaaBalance: 0,
+              aaaBalance: userData.aaaBalance - payoutAmount,
               lastPaid: admin.firestore.Timestamp.now(),
               lastVerifiedCount: currentVerifiedMembers, // Update verified count
             });
@@ -143,23 +151,24 @@ export async function processMonthlyPayouts(limit) {
               txId,
             });
           } catch (error) {
-            console.error(`Failed transaction for user ${userId}:`, error);
+            console.error(`Failed transaction for user ${userDoc.id}:`, error);
           }
         })
       );
     }
 
+    console.log("All users processed successfully.");
     return {
       message: "Monthly payouts processed successfully.",
       payouts,
     };
   } catch (error) {
     console.error("Error processing monthly payouts:", error);
-    throw new Error("Internal server error");
+    return { message: "Internal server error", error: (error as Error).message };
   }
 }
 
-async function getVerifiedMembers(userId) {
+async function getVerifiedMembers(userId: any) {
   const userSnapshot = await db.collection("users").doc(userId).get();
   if (!userSnapshot.exists) return 0;
 
@@ -168,7 +177,7 @@ async function getVerifiedMembers(userId) {
 
   if (referrals.length === 0) return 0;
 
-  const referralIds = referrals.map((referral) => referral.userId);
+  const referralIds = referrals.map((referral: any) => referral.userId);
 
   let verifiedCount = 0;
   const chunkSize = 30;
