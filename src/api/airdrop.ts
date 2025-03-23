@@ -18,6 +18,7 @@ const router = express.Router();
 //     amountOfTokenPerClaim,
 //     totalAmountOfTokens,
 //     shortDescription,
+//     airdropType,
 //     txId,
 //   } = req.body;
 
@@ -42,6 +43,7 @@ const router = express.Router();
 //       !shortDescription ||
 //       shortDescription?.length < 0 ||
 //       shortDescription?.length > 200 ||
+//       !airdropType ||
 //       !txId
 //     ) {
 //       return res.status(400).json({ message: "Invalid request data" });
@@ -82,6 +84,7 @@ const router = express.Router();
 //         totalAmountOfTokensClaimed: 0,
 //         shortDescription,
 //         completed: false,
+//         airdropType,
 //         claimedAddresses: [],
 //         createdAt: admin.firestore.Timestamp.fromDate(new Date()),
 //       };
