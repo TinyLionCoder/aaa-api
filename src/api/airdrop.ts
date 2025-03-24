@@ -215,6 +215,7 @@ router.post("/get-airdrops", async (req: Request, res: Response) => {
       amountOfTokenPerClaim: doc.data().amountOfTokenPerClaim,
       totalAmountOfTokens: doc.data().totalAmountOfTokens,
       totalAmountOfTokensClaimed: doc.data().totalAmountOfTokensClaimed,
+      airdropType: doc.data().airdropType,
       // ...doc.data(),
     }));
 
