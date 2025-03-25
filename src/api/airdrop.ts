@@ -8,99 +8,99 @@ import { verifyAirdropFeeTX } from "../algorand/transactionHelpers/verifyAirdrop
 
 const router = express.Router();
 
-// router.post("/create-airdrop", async (req: Request, res: Response) => {
-//   const {
-//     userId,
-//     email,
-//     tokenName,
-//     tokenId,
-//     tokenDecimals,
-//     amountOfTokenPerClaim,
-//     totalAmountOfTokens,
-//     shortDescription,
-//     airdropType,
-//     txId,
-//   } = req.body;
+router.post("/create-airdrop", async (req: Request, res: Response) => {
+  const {
+    userId,
+    email,
+    tokenName,
+    tokenId,
+    tokenDecimals,
+    amountOfTokenPerClaim,
+    totalAmountOfTokens,
+    shortDescription,
+    airdropType,
+    txId,
+  } = req.body;
 
-//   // Verify request origin and JWT
-//   const isValidRequest = verifyOriginAndJWT(req, email, userId);
-//   if (!isValidRequest) {
-//     return res.status(403).json({ message: "Forbidden" });
-//   }
+  // Verify request origin and JWT
+  const isValidRequest = verifyOriginAndJWT(req, email, userId);
+  if (!isValidRequest) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
 
-//   try {
-//     // Validate input
-//     if (
-//       !tokenName ||
-//       !tokenId ||
-//       tokenDecimals == null ||
-//       tokenDecimals < 0 ||
-//       !amountOfTokenPerClaim ||
-//       !totalAmountOfTokens ||
-//       amountOfTokenPerClaim <= 0 ||
-//       totalAmountOfTokens <= 0 ||
-//       totalAmountOfTokens < amountOfTokenPerClaim ||
-//       !shortDescription ||
-//       shortDescription?.length < 0 ||
-//       shortDescription?.length > 200 ||
-//       !airdropType ||
-//       !txId
-//     ) {
-//       return res.status(400).json({ message: "Invalid request data" });
-//     }
+  try {
+    // Validate input
+    if (
+      !tokenName ||
+      !tokenId ||
+      tokenDecimals == null ||
+      tokenDecimals < 0 ||
+      !amountOfTokenPerClaim ||
+      !totalAmountOfTokens ||
+      amountOfTokenPerClaim <= 0 ||
+      totalAmountOfTokens <= 0 ||
+      totalAmountOfTokens < amountOfTokenPerClaim ||
+      !shortDescription ||
+      shortDescription?.length < 0 ||
+      shortDescription?.length > 200 ||
+      !airdropType ||
+      !txId
+    ) {
+      return res.status(400).json({ message: "Invalid request data" });
+    }
 
-//     const feePaid = await verifyAirdropFeeTX(txId);
+    const feePaid = await verifyAirdropFeeTX(txId);
 
-//     if (!feePaid) {
-//       return res.status(400).json({ message: "Invalid fee transaction" });
-//     }
+    if (!feePaid) {
+      return res.status(400).json({ message: "Invalid fee transaction" });
+    }
     
-//     await db.runTransaction(async (transaction) => {
-//       const airdropCollectionRef = db.collection("airdrops");
-//       const existingAirdropQuery = await transaction.get(
-//         airdropCollectionRef
-//           .where("tokenName", "==", tokenName)
-//           .where("completed", "==", false)
-//           .limit(1)
-//       );
+    await db.runTransaction(async (transaction) => {
+      const airdropCollectionRef = db.collection("airdrops");
+      const existingAirdropQuery = await transaction.get(
+        airdropCollectionRef
+          .where("tokenName", "==", tokenName)
+          .where("completed", "==", false)
+          .limit(1)
+      );
 
-//       if (!existingAirdropQuery.empty) {
-//         throw new Error("An active airdrop already exists for this token");
-//       }
+      if (!existingAirdropQuery.empty) {
+        throw new Error("An active airdrop already exists for this token");
+      }
 
-//       await optIn(tokenId);
+      await optIn(tokenId);
 
-//       const currentDate = new Date().toISOString();
-//       const docId = `${tokenName}-${currentDate}`;
+      const currentDate = new Date().toISOString();
+      const docId = `${tokenName}-${currentDate}`;
 
-//       const newAirdrop = {
-//         userId,
-//         email,
-//         tokenName,
-//         tokenId,
-//         tokenDecimals,
-//         amountOfTokenPerClaim,
-//         totalAmountOfTokens,
-//         totalAmountOfTokensClaimed: 0,
-//         shortDescription,
-//         completed: false,
-//         airdropType,
-//         claimedAddresses: [],
-//         createdAt: admin.firestore.Timestamp.fromDate(new Date()),
-//       };
+      const newAirdrop = {
+        userId,
+        email,
+        tokenName,
+        tokenId,
+        tokenDecimals,
+        amountOfTokenPerClaim,
+        totalAmountOfTokens,
+        totalAmountOfTokensClaimed: 0,
+        shortDescription,
+        completed: false,
+        airdropType,
+        claimedAddresses: [],
+        createdAt: admin.firestore.Timestamp.fromDate(new Date()),
+      };
 
-//       const docRef = airdropCollectionRef.doc(docId);
-//       transaction.set(docRef, newAirdrop);
-//     });
+      const docRef = airdropCollectionRef.doc(docId);
+      transaction.set(docRef, newAirdrop);
+    });
 
-//     res.status(201).json({ message: "Airdrop created successfully" });
-//   } catch (error) {
-//     console.error("Error creating airdrop:", error);
-//     const errorMessage =
-//       error instanceof Error ? error.message : "Internal server error";
-//     res.status(500).json({ message: errorMessage });
-//   }
-// });
+    res.status(201).json({ message: "Airdrop created successfully" });
+  } catch (error) {
+    console.error("Error creating airdrop:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Internal server error";
+    res.status(500).json({ message: errorMessage });
+  }
+});
 
 router.post("/update-claimed-address", async (req: Request, res: Response) => {
   const { userId, email, tokenName, address } = req.body;
