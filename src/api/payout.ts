@@ -327,10 +327,11 @@ router.post("/payouts/current/:userId", async (req: Request, res: Response) => {
 
     // Calculate current payout
     // const x = aaaBalance - totalPayout;
-    const y =
+    let y =
       lastVerifiedCount > 0
         ? newlyVerifiedMembers * 5
         : newlyVerifiedMembers * 5 + 5;
+    y = userData?.verified ? y : 0;
 
     res.status(200).json({
       userId,
