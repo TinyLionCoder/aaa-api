@@ -12,6 +12,7 @@ import getUserDetails from "./getUserDetails";
 import createAirdrop from "./airdrop";
 import massSendToOptedInWallet from "./massSendToOptedInWallet";
 import user from "./user";
+import dailyCheckIn from "./dailyCheckIn";
 import {
   apiLimiter,
   strictLimiter,
@@ -38,5 +39,6 @@ router.use("/verify", strictLimiter, verify);
 router.use("/referrals", moderateLimiter, myTeam);
 router.use("/airdrop", moderateLimiter, createAirdrop);
 router.use("/mass", massSendToOptedInWallet);
+router.use("/checkin", moderateLimiter, dailyCheckIn);
 
 export default router;
