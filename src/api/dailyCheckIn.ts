@@ -59,6 +59,7 @@ router.post("/daily-checkin", async (req: Request, res: Response) => {
     await userRef.update({
       checkInStreak: newStreak,
       lastCheckInDate: new Date().toISOString(),
+      bonusTokensEarned: admin.firestore.FieldValue.increment(reward),
       aaaBalance: admin.firestore.FieldValue.increment(reward),
     });
 
