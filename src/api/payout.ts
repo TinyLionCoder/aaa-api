@@ -340,8 +340,12 @@ router.post("/payouts/current/:userId", async (req: Request, res: Response) => {
       verifiedMembersCount,
       currentPayout:
         y > 0
-          ? y + (userData?.bonusTokensEarned ? userData?.bonusTokensEarned : 0)
-          : 0 + (userData?.bonusTokensEarned ? userData?.bonusTokensEarned : 0), // Ensure payout is non-negative
+          ? y +
+            (userData?.bonusTokensEarned ? userData?.bonusTokensEarned : 0) -
+            (userData?.bonusTokensPaid ? userData.bonusTokensPaid : 0)
+          : 0 +
+            (userData?.bonusTokensEarned ? userData?.bonusTokensEarned : 0) -
+            (userData?.bonusTokensPaid ? userData.bonusTokensPaid : 0), // Ensure payout is non-negative
     });
   } catch (error) {
     console.error("Error calculating current payout:", error);
