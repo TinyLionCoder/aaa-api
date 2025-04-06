@@ -333,19 +333,24 @@ router.post("/payouts/current/:userId", async (req: Request, res: Response) => {
         : newlyVerifiedMembers * 5 + 5;
     y = userData?.verified ? y : 0;
 
+    const bonusTokensEarned = userData?.bonusTokensEarned
+      ? userData.bonusTokensEarned
+      : 0;
+
+    const bonusTokensPaid = userData?.bonusTokensPaid
+      ? userData.bonusTokensPaid
+      : 0;
+
+    const bonustoPayout = bonusTokensEarned - bonusTokensPaid;
+
+    const currentPayout = y > 0 ? y + bonustoPayout : 0 + bonustoPayout;
+
     res.status(200).json({
       userId,
       aaaBalance,
       totalPayout,
       verifiedMembersCount,
-      currentPayout:
-        y > 0
-          ? y +
-            (userData?.bonusTokensEarned ? userData?.bonusTokensEarned : 0) -
-            (userData?.bonusTokensPaid ? userData.bonusTokensPaid : 0)
-          : 0 +
-            (userData?.bonusTokensEarned ? userData?.bonusTokensEarned : 0) -
-            (userData?.bonusTokensPaid ? userData.bonusTokensPaid : 0), // Ensure payout is non-negative
+      currentPayout: userData?.verified ? Number(currentPayout.toFixed(1)) : 0,
     });
   } catch (error) {
     console.error("Error calculating current payout:", error);
